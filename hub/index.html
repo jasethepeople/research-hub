@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Local Research Hub</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e8ecf0;background:#10151b;font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-width:980px}header{padding:24px 28px 18px;border-bottom:1px solid #27313c;background:#151d26}h1{margin:0 0 14px;font-size:22px;letter-spacing:.01em}form{display:flex;gap:10px;max-width:780px}input{flex:1;min-width:0;padding:11px 13px;border:1px solid #3b4855;border-radius:7px;background:#0e141a;color:#f4f6f8;font-size:15px}button{padding:0 18px;border:0;border-radius:7px;background:#91c8ff;color:#102033;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.meta{margin:10px 0 0;color:#9eabb8;font-size:12px}.panes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:18px 20px}.panes.four{grid-template-columns:repeat(4,minmax(0,1fr))}.pane{min-height:300px;padding:15px;border:1px solid #2c3742;border-radius:10px;background:#151d26;overflow-wrap:anywhere}.pane h2{margin:0 0 11px;font-size:16px}.statuses{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 13px}.tier{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border-radius:99px;background:#202a34;color:#c6d0da;font-size:11px}.dot{width:8px;height:8px;border-radius:50%;background:#707d89;display:inline-block}.dot.ok{background:#58d68d}.dot.degraded{background:#f4c95d}.dot.skipped,.dot.absent{background:#f07878}.error{display:none;margin:0 0 12px;padding:9px;border-left:3px solid #f07878;background:#2b2023;color:#ffb7b7;font-size:12px}.error.visible{display:block}.result{padding:11px 0;border-top:1px solid #2c3742}.result a{color:#a8d6ff;font-weight:650;text-decoration:none}.result a:hover{text-decoration:underline}.byline{margin-top:4px;color:#9eabb8;font-size:12px}.empty{color:#82909d;font-size:13px;padding:8px 0}.also{color:#82909d;font-size:11px;margin-top:4px}
+</style>
+</head>
+<body>
+<header>
+<h1>Local Research Hub</h1>
+<form id="search-form"><input id="query" name="query" placeholder="Search across your registered tiers" autocomplete="off" required><button id="submit" type="submit">Search</button></form>
+<p class="meta">Local-only host · results are served by your registered MCP tiers.</p>
+</header>
+<main id="panes" class="panes">
+<section class="pane" data-pane="literature"><h2>Literature</h2><div class="statuses"></div><div class="error"></div><div class="results"><div class="empty">Search to begin.</div></div></section>
+<section class="pane" data-pane="vulns"><h2>Vulnerabilities</h2><div class="statuses"></div><div class="error"></div><div class="results"><div class="empty">Search to begin.</div></div></section>
+<section class="pane" data-pane="code"><h2>Local code</h2><div class="statuses"></div><div class="error"></div><div class="results"><div class="empty">Search to begin.</div></div></section>
+</main>
+<script>
+const fourthPaneEnabled = __FOURTH_PANE__;
+const panes = [...document.querySelectorAll(".pane")];
+if (fourthPaneEnabled) {
+  document.querySelector("#panes").classList.add("four");
+  const pane = document.createElement("section");
+  pane.className = "pane";
+  pane.dataset.pane = "other";
+  pane.innerHTML = '<h2>Other tiers</h2><div class="statuses"></div><div class="error"></div><div class="results"><div class="empty">Search to begin.</div></div>';
+  document.querySelector("#panes").append(pane);
+  panes.push(pane);
+}
+function paneFor(tier) {
+  const name = tier.toLowerCase();
+  if (/vuln|cve|security/.test(name)) return "vulns";
+  if (/code|repo|local/.test(name)) return "code";
+  if (/liter|paper|book|archive|journal/.test(name)) return "literature";
+  return fourthPaneEnabled ? "other" : "literature";
+}
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+}
+function showResults(results, notes) {
+  for (const pane of panes) {
+    const category = pane.dataset.pane;
+    const tierNames = Object.keys(notes).filter(name => paneFor(name) === category);
+    const statuses = pane.querySelector(".statuses");
+    statuses.innerHTML = tierNames.length
+      ? tierNames.map(name => `<span class="tier"><i class="dot ${esc(notes[name].state)}"></i>${esc(name)}</span>`).join("")
+      : '<span class="tier"><i class="dot"></i>No tier registered</span>';
+    const failures = tierNames.filter(name => ["degraded","skipped","absent"].includes(notes[name].state));
+    const error = pane.querySelector(".error");
+    error.textContent = failures.length
+      ? failures.map(name => `${name}: ${notes[name].note || notes[name].state}`).join(" · ")
+      : "";
+    error.classList.toggle("visible", failures.length > 0);
+    const items = results.filter(item => paneFor(item.tier) === category);
+    const resultTarget = pane.querySelector(".results");
+    resultTarget.innerHTML = items.length ? items.map(item => {
+      const title = esc(item.title);
+      const safeUrl = /^https?:\/\//i.test(item.url || "") ? item.url : "";
+      const url = esc(safeUrl);
+      const author = item.author ? ` · ${esc(item.author)}` : "";
+      const also = item.also_on?.length ? `<div class="also">Also on: ${item.also_on.map(esc).join(", ")}</div>` : "";
+      const link = url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>` : title;
+      return `<article class="result">${link}<div class="byline">${esc(item.tier)}${author}</div>${also}</article>`;
+    }).join("") : '<div class="empty">No results in this pane.</div>';
+  }
+}
+document.querySelector("#search-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const query = document.querySelector("#query").value.trim();
+  if (!query) return;
+  const button = document.querySelector("#submit");
+  button.disabled = true;
+  button.textContent = "Searching…";
+  for (const pane of panes) pane.querySelector(".error").classList.remove("visible");
+  try {
+    const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`, {headers:{Accept:"application/json"}});
+    if (!response.ok) throw new Error(`Search failed (${response.status}).`);
+    const data = await response.json();
+    showResults(data.results || [], data.notes || {});
+  } catch (error) {
+    for (const pane of panes) {
+      const target = pane.querySelector(".error");
+      target.textContent = error.message || "Search failed.";
+      target.classList.add("visible");
+    }
+  } finally {
+    button.disabled = false;
+    button.textContent = "Search";
+  }
+});
+</script>
+</body>
+</html>
