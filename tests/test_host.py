@@ -8,7 +8,7 @@ from hub.cache import ResponseCache
 from hub.fetch import MAX_BYTES, FetchError, fetch_url
 from hub.registry import assert_mcp_v1, tier_environment
 from hub.storage import Store
-from tests.conftest import free_port, stub_config
+from tests.conftest import stub_config
 
 
 def test_dashboard_has_three_panes_and_optional_fourth(make_client):
