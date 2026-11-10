@@ -1,4 +1,5 @@
 import json
+import socket
 import sys
 from pathlib import Path
 
@@ -34,16 +35,30 @@ def stub_config(name: str, mode: str = "ok") -> dict:
 
 
 @pytest.fixture
+def free_port() -> int:
+    """Bind 127.0.0.1:0, read the assigned port, release it.
+
+    Tests that make outbound requests to "a local port" must own the port they
+    name: the live hub may legitimately be listening on 8471 while the suite
+    runs, and a test that assumes 8471 is free goes red exactly when the
+    thing it is supposed to verify is running.
+    """
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+@pytest.fixture
 def make_client(tmp_path):
     clients = []
 
-    def build(config: dict, timeout: float = 12, fourth_pane: bool = False) -> TestClient:
+    def build(config: dict, timeout: float = 12, fourth_pane: bool = False, port: int | None = None) -> TestClient:
         registry_path = tmp_path / "mcp_servers.json"
         registry_path.write_text(json.dumps(config), encoding="utf-8")
         settings = Settings(
             deploy_dir=DEPLOY_DIR,
             state_dir=tmp_path / "state",
-            port=8471,
+            port=port if port is not None else 8471,
             tier_timeout=timeout,
             fourth_pane=fourth_pane,
             registry_path=registry_path,

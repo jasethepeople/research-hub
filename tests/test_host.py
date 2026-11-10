@@ -8,7 +8,7 @@ from hub.cache import ResponseCache
 from hub.fetch import MAX_BYTES, FetchError, fetch_url
 from hub.registry import assert_mcp_v1, tier_environment
 from hub.storage import Store
-from tests.conftest import stub_config
+from tests.conftest import free_port, stub_config
 
 
 def test_dashboard_has_three_panes_and_optional_fourth(make_client):
@@ -213,11 +213,19 @@ def test_fetch_strips_scripts_and_rejects_non_text(monkeypatch):
         asyncio.run(fetch_url("https://example.invalid/", internal=True))
 
 
-def test_loopback_fetch_is_refused_without_internal_flag(make_client):
-    with make_client({}) as client:
-        response = client.get("/api/fetch", params={"url": "http://127.0.0.1:8471/"})
+def test_loopback_fetch_is_refused_without_internal_flag(make_client, free_port):
+    """The 502 case owns its upstream port: bind 127.0.0.1:0, take the
+    assigned port, release it, and point both the server config and the
+    fetched URL at it. Strict asserts stay: exactly 403 without internal=1,
+    exactly 502 with it (nothing listens on the claimed port). Never accept
+    200-or-502: a stray listener would then hide behind the lax assert.
+    """
+    port = free_port
+    url = f"http://127.0.0.1:{port}/"
+    with make_client({}, port=port) as client:
+        response = client.get("/api/fetch", params={"url": url})
         assert response.status_code == 403
-        allowed = client.get("/api/fetch", params={"url": "http://127.0.0.1:8471/", "internal": "true"})
+        allowed = client.get("/api/fetch", params={"url": url, "internal": "true"})
         assert allowed.status_code == 502
 
 

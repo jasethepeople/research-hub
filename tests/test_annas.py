@@ -183,13 +183,21 @@ def test_parser_fixture_has_valid_results(fixture):
 
 
 def test_parse_results_passes_against_real_markup():
+    """Captured live from https://annas-archive.gd/search?q=clean+code&display=table
+
+    (2026-11-10, via a real browser session; .gd was still serving the classic
+    /md5/ results TABLE layout, not /books/<id>-<slug> cards). The fixture is
+    the extracted results <table> only - a search-results page, not a detail
+    page or a mirror interstitial. Band assert: a healthy table parses 20-50
+    rows at limit=50; "> 0" alone would pass on a single stray anchor.
+    """
     html = REAL_FIXTURE.read_text(encoding="utf-8", errors="replace")
     assert len(html) > 20_000, f"real fixture unexpectedly small: {len(html)} bytes"
     assert re.search(r'href=["\']/md5/[0-9a-fA-F]{32}', html), "expected a stable md5 anchor"
     assert "DDoS-Guard" not in html and "cf-browser-verification" not in html
     parsed = annas.parse_results(html, limit=50)
     assert isinstance(parsed, list)
-    assert len(parsed) >= 40, f"real fixture should parse ~50 rows, got {len(parsed)}"
+    assert 20 <= len(parsed) <= 50, f"real fixture should parse 20-50 rows, got {len(parsed)}"
     for item in parsed:
         assert re.fullmatch(r"[0-9a-f]{32}", item["md5"])
         assert item["title"].strip()
