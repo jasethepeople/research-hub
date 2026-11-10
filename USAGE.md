@@ -126,9 +126,10 @@ Registered out of the box (`mcp_servers.json` → `annas`). It signs in with
 
 **Set your key without committing it:**
 
-```bash
-export HUB_TIER_ANNAS__ANNAS_KEY="your-key-here"
-```
+Assign your account key to the variable `HUB_TIER_ANNAS__ANNAS_KEY`
+(`ANNAS_KEY`, scoped to this tier — see the env table in INSTALL.md) in your
+shell profile or secret manager. Never paste the value into any file in this
+repository; the selfcheck fails if a key-shaped string is ever committed.
 
 ## 7. The RAG tier: build a local, searchable corpus
 
@@ -182,7 +183,7 @@ The tier exposes two research tools beyond the required five:
 ```bash
 export LLM_BASE_URL="https://api.openai.com/v1"   # or any compatible server
 export LLM_MODEL="gpt-4o-mini"
-export LLM_API_KEY="sk-..."                       # via env, never in files
+# set LLM_API_KEY the same way (environment only, never in files)
 ```
 
 No LLM configured? `rag_ask` still returns the retrieved passages as
