@@ -31,26 +31,28 @@ def search_vector(
     query: str,
     limit: int,
     embedder: Embedder,
+    doc_ids: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
     assert_model(connection)
     vector = embedder([query])[0]
     if len(vector) != EMBED_DIM:
         raise EmbedMismatch(f"embedder produced {len(vector)} dimensions, expected {EMBED_DIM}")
     probe = _serialize(vector)
+    scope, scope_params = _scope_filter(doc_ids)
     candidate_count = max(limit * 4, 20)
     rows = connection.execute(
-        """
-        SELECT vec_chunks.rowid AS chunk_id, chunks.doc_id, chunks.idx, chunks.text,
+        f"""
+        SELECT vec_chunks.rowid AS chunk_id, chunks.doc_id, chunks.idx, chunks.text, chunks.page,
                corpus.md5, corpus.title,
                1.0 - vec_distance_cosine(vec_chunks.embedding, ?) AS similarity
         FROM vec_chunks
         JOIN chunks ON chunks.chunk_id = vec_chunks.rowid
         JOIN corpus ON corpus.doc_id = chunks.doc_id
-        WHERE vec_chunks.embedding MATCH ? AND vec_chunks.k = ?
+        WHERE vec_chunks.embedding MATCH ? AND vec_chunks.k = ?{scope}
         ORDER BY distance
         LIMIT ?
         """,
-        (probe, probe, candidate_count, candidate_count),
+        (probe, probe, candidate_count, *scope_params, candidate_count),
     ).fetchall()
     return [
         {
@@ -59,6 +61,7 @@ def search_vector(
             "md5": row["md5"],
             "title": row["title"],
             "idx": row["idx"],
+            "page": row["page"] or 1,
             "text": row["text"],
             "score": row["similarity"],
         }
@@ -67,22 +70,47 @@ def search_vector(
     ][:limit]
 
 
-def search_bm25(connection: sqlite3.Connection, query: str, limit: int) -> list[dict[str, Any]]:
+def _scope_filter(doc_ids: Sequence[str] | None) -> tuple[str, list[str]]:
+    """SQL fragment restricting results to the given doc_ids (16-hex) or md5s (32-hex)."""
+    if not doc_ids:
+        return "", []
+    md5s = [value for value in doc_ids if len(value) == 32]
+    ids = [value for value in doc_ids if len(value) != 32]
+    clauses: list[str] = []
+    params: list[str] = []
+    if md5s:
+        clauses.append("corpus.md5 IN (" + ", ".join("?" * len(md5s)) + ")")
+        params.extend(md5s)
+    if ids:
+        clauses.append("chunks.doc_id IN (" + ", ".join("?" * len(ids)) + ")")
+        params.extend(ids)
+    if not clauses:
+        return " AND 0", []
+    return " AND (" + " OR ".join(clauses) + ")", params
+
+
+def search_bm25(
+    connection: sqlite3.Connection,
+    query: str,
+    limit: int,
+    doc_ids: Sequence[str] | None = None,
+) -> list[dict[str, Any]]:
     match = _fts_query(query)
     if not match:
         return []
+    scope, scope_params = _scope_filter(doc_ids)
     rows = connection.execute(
-        """
-        SELECT chunks.chunk_id, chunks.doc_id, chunks.idx, chunks.text,
+        f"""
+        SELECT chunks.chunk_id, chunks.doc_id, chunks.idx, chunks.text, chunks.page,
                corpus.md5, corpus.title, bm25(chunks_fts) AS rank
         FROM chunks_fts
         JOIN chunks ON chunks.chunk_id = chunks_fts.rowid
         JOIN corpus ON corpus.doc_id = chunks.doc_id
-        WHERE chunks_fts MATCH ?
+        WHERE chunks_fts MATCH ?{scope}
         ORDER BY rank
         LIMIT ?
         """,
-        (match, limit),
+        (match, *scope_params, limit),
     ).fetchall()
     return [
         {
@@ -91,6 +119,7 @@ def search_bm25(connection: sqlite3.Connection, query: str, limit: int) -> list[
             "md5": row["md5"],
             "title": row["title"],
             "idx": row["idx"],
+            "page": row["page"] or 1,
             "text": row["text"],
             "score": -row["rank"],
         }
@@ -121,8 +150,13 @@ def search(
     limit: int = 5,
     embedder: Embedder | None = None,
     reranker: Callable[[str, list[str]], list[float]] | None = None,
+    doc_ids: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Dispatch on mode; hybrid fuses vector and bm25 with RRF (k=60)."""
+    """Dispatch on mode; hybrid fuses vector and bm25 with RRF (k=60).
+
+    doc_ids scopes retrieval to those documents (md5 or doc_id accepted); it is
+    applied inside the SQL of both channels so limits stay meaningful.
+    """
     if embedder is not None and not callable(embedder) and callable(getattr(embedder, "encode", None)):
         embedder = embedder.encode
     query = " ".join(str(query).split())
@@ -131,22 +165,22 @@ def search(
     if mode == "vector":
         if embedder is None:
             raise ValueError("vector mode requires an embedder")
-        return search_vector(connection, query, limit, embedder)
+        return search_vector(connection, query, limit, embedder, doc_ids)
     if mode == "bm25":
-        return search_bm25(connection, query, limit)
+        return search_bm25(connection, query, limit, doc_ids)
     if mode not in {"hybrid", "hybrid_rerank"}:
         raise ValueError(f"unknown retrieval mode: {mode}")
     if embedder is None:
         raise ValueError("hybrid modes require an embedder")
-    vector_hits = search_vector(connection, query, limit, embedder)
-    bm25_hits = search_bm25(connection, query, limit)
+    vector_hits = search_vector(connection, query, limit, embedder, doc_ids)
+    bm25_hits = search_bm25(connection, query, limit, doc_ids)
     fused = _reciprocal_rank_fusion([vector_hits, bm25_hits], limit)
     if mode == "hybrid":
         return fused
     candidates = _reciprocal_rank_fusion(
         [
-            search_vector(connection, query, RERANK_CANDIDATES, embedder),
-            search_bm25(connection, query, RERANK_CANDIDATES),
+            search_vector(connection, query, RERANK_CANDIDATES, embedder, doc_ids),
+            search_bm25(connection, query, RERANK_CANDIDATES, doc_ids),
         ],
         RERANK_CANDIDATES,
     )

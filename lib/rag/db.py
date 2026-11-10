@@ -13,6 +13,7 @@ import json
 import os
 import sqlite3
 import time
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     doc_id TEXT NOT NULL REFERENCES corpus(doc_id) ON DELETE CASCADE,
     idx INTEGER NOT NULL,
     text TEXT NOT NULL,
+    page INTEGER NOT NULL DEFAULT 1,
     UNIQUE(doc_id, idx)
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
@@ -107,6 +109,9 @@ def connect(path: str | os.PathLike[str] | None = None) -> sqlite3.Connection:
 def initialize(connection: sqlite3.Connection) -> None:
     with connection:
         connection.executescript(SCHEMA)
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(chunks)").fetchall()}
+        if "page" not in columns:
+            connection.execute("ALTER TABLE chunks ADD COLUMN page INTEGER NOT NULL DEFAULT 1")
 
 
 def open_db(path: str | os.PathLike[str] | None = None) -> sqlite3.Connection:
@@ -173,6 +178,7 @@ def add_document(
     chunks: list[str],
     embeddings: list[list[float]],
     path: str = "",
+    chunk_pages: Sequence[int] | None = None,
 ) -> str:
     if len(chunks) != len(embeddings):
         raise ValueError("chunks and embeddings must have the same length")
@@ -190,9 +196,12 @@ def add_document(
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (identifier, md5, title, source, path, text, n_pages, len(chunks), now),
         )
+        pages = list(chunk_pages) if chunk_pages is not None else [1] * len(chunks)
+        if len(pages) != len(chunks):
+            raise ValueError("chunk_pages must match chunks in length when given")
         connection.executemany(
-            "INSERT INTO chunks (doc_id, idx, text) VALUES (?, ?, ?)",
-            [(identifier, index, chunk) for index, chunk in enumerate(chunks)],
+            "INSERT INTO chunks (doc_id, idx, text, page) VALUES (?, ?, ?, ?)",
+            [(identifier, index, chunk, pages[index]) for index, chunk in enumerate(chunks)],
         )
         chunk_rows = connection.execute(
             "SELECT chunk_id FROM chunks WHERE doc_id = ? ORDER BY idx", (identifier,)

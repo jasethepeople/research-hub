@@ -11,12 +11,21 @@ from lib.rag.tools.eval_rag import load_golden
 
 def coverage(connection: sqlite3.Connection, golden: list[dict]) -> dict:
     stored = {row["md5"] for row in connection.execute("SELECT md5 FROM corpus")}
-    missing = [{"question": item["question"], "md5": item["md5"]} for item in golden if item["md5"] not in stored]
+    queries = [
+        {
+            "question": item["question"],
+            "md5": item["md5"],
+            "status": "missing" if item["md5"] not in stored else "covered",
+        }
+        for item in golden
+    ]
+    missing = [entry for entry in queries if entry["status"] == "missing"]
     return {
         "queries": len(golden),
         "corpus_docs": len(stored),
         "covered": len(golden) - len(missing),
         "missing": missing,
+        "per_query": queries,
     }
 
 

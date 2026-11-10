@@ -35,16 +35,21 @@ def _open():
     return connection
 
 
-def search(query: str, limit: int = 20) -> str:
+async def search(query: str, limit: int = 20) -> str:
     if not available() or not query.strip():
         return _unavailable()
-    connection = _open()
+
+    def _work() -> list[dict[str, Any]]:
+        connection = _open()
+        try:
+            return retrieve.search(connection, query, mode="hybrid_rerank", limit=limit, embedder=get_embedder())
+        finally:
+            connection.close()
+
     try:
-        hits = retrieve.search(connection, query, mode="hybrid_rerank", limit=limit, embedder=get_embedder())
+        hits = await asyncio.to_thread(_work)
     except RagUnavailable:
         return _unavailable()
-    finally:
-        connection.close()
     results = [
         {
             "title": hit["title"],
@@ -57,9 +62,9 @@ def search(query: str, limit: int = 20) -> str:
     return _result({"results": results, "note": ""})
 
 
-def fetch_page(url: str) -> str:
+async def fetch_page(url: str) -> str:
     try:
-        payload = asyncio.run(fetch_url(url, internal=False))
+        payload = await fetch_url(url, internal=False)
     except Exception as error:  # noqa: BLE001 - report any failure as a note
         return _result({"text": "", "bytes": 0, "note": f"{error.__class__.__name__}: {error}"})
     return _result({"text": payload["text"], "bytes": payload["bytes"], "note": payload["note"]})
@@ -97,29 +102,37 @@ def unpin(id: str) -> str:
     return _result({"deleted": removed, "id": id})
 
 
-def rag_ask(question: str, mode: str = "hybrid_rerank", limit: int = 6) -> str:
+async def rag_ask(question: str, mode: str = "hybrid_rerank", limit: int = 6) -> str:
     if not available() or not question.strip():
         return _unavailable()
-    connection = _open()
+
+    def _work() -> dict[str, Any]:
+        connection = _open()
+        try:
+            return answer(connection, question, mode=mode, limit=limit, embedder=get_embedder())
+        finally:
+            connection.close()
+
     try:
-        outcome = answer(connection, question, mode=mode, limit=limit, embedder=get_embedder())
+        outcome = await asyncio.to_thread(_work)
     except RagUnavailable:
         return _unavailable()
-    finally:
-        connection.close()
     return _result(outcome)
 
 
-def rag_index(source: str, title: str = "") -> str:
+async def rag_index(source: str, title: str = "") -> str:
     """Ingest a URL or local file into the local corpus using the tier's own downloader."""
     if not available():
         return _unavailable()
-    try:
+
+    def _work() -> dict[str, Any]:
         embedder = get_embedder()
         if source.startswith("http://") or source.startswith("https://"):
-            outcome = ingest_url(source, title=title, embedder=embedder)
-        else:
-            outcome = ingest_document(Path(source), title=title, embedder=embedder)
+            return ingest_url(source, title=title, embedder=embedder)
+        return ingest_document(Path(source), title=title, embedder=embedder)
+
+    try:
+        outcome = await asyncio.to_thread(_work)
     except ScannedDoc:
         return _result({"indexed": False, "note": "scanned document; run ocr_pdf ingestion"})
     except OcrUnavailable as error:

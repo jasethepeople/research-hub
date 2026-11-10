@@ -33,7 +33,7 @@ SECRET_PATTERNS = [
     "AI" "za",
     "gl" "pat_",
     "xo" "xb-",
-    "sk-" "ant-",
+    "sk" "-ant" "-",
     "HF_" "TOKEN",
 ]
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from contextlib import contextmanager
@@ -32,8 +33,35 @@ def _minutes_of(day_time: tuple[int, int]) -> int:
     return day_time[0] * 60 + day_time[1]
 
 
+def override_path() -> Path:
+    state = os.environ.get("HUB_STATE") or "~/.local/share/intel-hub"
+    return Path(state).expanduser() / "ingest-override.json"
+
+
+def read_override(now: float | None = None, path: Path | None = None) -> tuple[bool, str]:
+    """(active, note) for the override file; an expired file is ignored, not deleted."""
+    moment = time.time() if now is None else now
+    target = path or override_path()
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, ValueError):
+        return False, ""
+    if not isinstance(payload, dict):
+        return False, ""
+    try:
+        until = float(payload["until"])
+    except (KeyError, TypeError, ValueError):
+        return False, ""
+    if moment >= until:
+        return False, ""
+    return True, str(payload.get("reason", "override active"))
+
+
 def can_ingest(now: float | None = None, spec: str | None = None) -> tuple[bool, str]:
-    """True when ingestion is allowed: no INGEST_WINDOWS set, or now falls inside a window."""
+    """True when ingestion is allowed: override file active, no INGEST_WINDOWS set, or now inside a window."""
+    override_active, override_note = read_override(now=now)
+    if override_active:
+        return True, override_note
     if spec is None:
         spec = os.environ.get("INGEST_WINDOWS", "")
     windows = parse_windows(spec)
@@ -42,7 +70,13 @@ def can_ingest(now: float | None = None, spec: str | None = None) -> tuple[bool,
     moment = datetime.fromtimestamp(time.time() if now is None else now, UTC)
     current = moment.hour * 60 + moment.minute
     for start, end in windows:
-        if _minutes_of(start) <= current < _minutes_of(end):
+        start_minutes = _minutes_of(start)
+        end_minutes = _minutes_of(end)
+        if start_minutes <= end_minutes:
+            inside = start_minutes <= current < end_minutes
+        else:
+            inside = current >= start_minutes or current < end_minutes
+        if inside:
             return True, ""
     pretty = ", ".join(f"{start[0]:02d}:{start[1]:02d}-{end[0]:02d}:{end[1]:02d}" for start, end in windows)
     return False, f"Outside ingestion windows ({pretty} UTC)."

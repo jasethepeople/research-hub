@@ -78,7 +78,13 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
     async def health():
         registry: Registry = app.state.registry
         tiers = registry.health()
-        return {"tiers": tiers, **tiers, "cache_ttl": CACHE_TTL}
+        reserved = {"tiers", "cache_ttl", "tier_meta"}
+        top_level = {name: info for name, info in tiers.items() if name not in reserved}
+        collisions = {name: tiers[name] for name in tiers if name in reserved}
+        payload: dict[str, Any] = {"tiers": tiers, **top_level, "cache_ttl": CACHE_TTL}
+        if collisions:
+            payload["tier_meta"] = collisions
+        return payload
 
     @app.get("/api/fetch")
     async def fetch(url: str, internal: bool = False):
