@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from pathlib import Path
 
@@ -199,6 +200,39 @@ def test_parse_results_passes_against_real_markup():
     assert isinstance(parsed, list)
     assert 20 <= len(parsed) <= 50, f"real fixture should parse 20-50 rows, got {len(parsed)}"
     for item in parsed:
+        assert re.fullmatch(r"[0-9a-f]{32}", item["md5"])
+        assert item["title"].strip()
+        assert item["md5"] in item["url"]
+
+
+def _live_annas() -> AnnaArchive:
+    mirror = os.environ.get("ANNAS_MIRROR", "")
+    if not mirror.startswith("http"):
+        pytest.skip("live search not requested (set ANNAS_MIRROR=https://...)")
+    return AnnaArchive(mirror=mirror)
+
+
+def test_live_annas_search_returns_parseable_results():
+    """Search-only live check: fetches a real search page from ANNAS_MIRROR and
+    parses it. No key required (the key only matters for fast-download, which
+    this test deliberately does not exercise). Skips when ANNAS_MIRROR is unset,
+    so offline/default runs never touch the network."""
+    archive = _live_annas()
+    try:
+        outcome = archive.search("clean code", limit=5)
+    except ChallengeEncountered:
+        pytest.skip(f"mirror {archive.mirror} served a challenge page")
+    except httpx.HTTPError as error:
+        pytest.skip(f"mirror {archive.mirror} unreachable: {error}")
+    if outcome.get("note") == "challenge":
+        pytest.skip(
+            f"mirror {archive.mirror} served a challenge page to this IP "
+            "(cloud IPs get DDoS-Guard; run from a residential network)"
+        )
+    assert outcome.get("note", "") == "", outcome.get("note")
+    results = outcome["results"]
+    assert 1 <= len(results) <= 5
+    for item in results:
         assert re.fullmatch(r"[0-9a-f]{32}", item["md5"])
         assert item["title"].strip()
         assert item["md5"] in item["url"]

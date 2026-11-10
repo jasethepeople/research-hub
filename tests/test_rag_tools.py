@@ -59,6 +59,12 @@ def test_curate_export_import_roundtrip_is_md5_keyed(corpus, tmp_path):
     again = curate.import_docs(corpus, out_path, hash_embed)
     assert again["imported"] == 0, "re-import must skip existing md5 keys"
 
+    from lib.rag.db import list_pending_pins
+
+    assert {pin["md5"] for pin in list_pending_pins(corpus)} == {"f" * 32}, (
+        "export/import round-trip must preserve pending pins"
+    )
+
 
 def test_curate_prune_pending_clears_queue(corpus):
     pruned = curate.prune_pending(corpus)

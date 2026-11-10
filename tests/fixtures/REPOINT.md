@@ -35,3 +35,22 @@ browser session (View Source, save as `search_page_real.html`).
 
 Once `search_page_real.html` passes, remove the "parser verified against
 synthesized markup only" line from `GUARDRAILS.md` → Known gaps.
+
+
+## Status update
+
+A real `.gd` capture **was** obtained (2026-11-10) — but via Zo's managed browser,
+which clears the DDoS-Guard interstitial automatically, not via curl. The curl
+command above still fails from cloud IPs with `DDoS-Guard` (902-byte interstitial).
+`tests/fixtures/search_page_real.html` is the real markup, slimmed to the results
+table, and `test_parse_results_passes_against_real_markup` is **unskipped and
+green** (50 rows).
+
+The parser targets the **table layout** (`href="/md5/<32hex>"` rows), which `.gd`
+still serves in its `?display=table` view. Per shelfmark#1317, other surfaces are
+moving to `/books/<id>-<slug>` cards; the `.gd` table view is the pinned surface.
+Re-capture if it flips.
+
+The live round-trip test `test_live_annas_search_returns_parseable_results`
+(set `ANNAS_MIRROR` to enable) **skips with `challenge`** from cloud IPs and
+green-checks the full fetch→sign-in→parse path from residential networks.
