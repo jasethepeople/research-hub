@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Sequence
 
@@ -31,6 +32,9 @@ class LexicalReranker:
         recall = overlap / len(query_tokens)
         return 2 * precision * recall / (precision + recall)
 
+    def score_many(self, query: str, texts: Sequence[str]) -> list[float]:
+        return [self.score(query, text) for text in texts]
+
 
 class CrossEncoderReranker:
     """fastembed cross-encoder; the model downloads on first use."""
@@ -46,24 +50,57 @@ class CrossEncoderReranker:
             self._model = TextCrossEncoder(model_name=self.model)
         return self._model
 
-    def score(self, query: str, text: str) -> float:
+    def score_many(self, query: str, texts: Sequence[str]) -> list[float]:
+        """One inference pass for the whole batch."""
+        if not texts:
+            return []
         instance = self._instance()
-        for value in instance.rerank(query, [text]):
-            return float(value)
-        return 0.0
+        return [float(value) for value in instance.rerank(query, list(texts))]
+
+    def score(self, query: str, text: str) -> float:
+        scores = self.score_many(query, [text])
+        return scores[0] if scores else 0.0
+
+
+class LazyReranker:
+    """Defers cross-encoder loading until the first score call.
+
+    get_reranker() used to instantiate the cross-encoder to probe it, which
+    downloaded the model mid-request on first search. This wrapper pays that
+    cost on first use instead, caches the resolution, and falls back to the
+    lexical reranker if the cross-encoder cannot load or score.
+    """
+
+    def __init__(self) -> None:
+        self._delegate: LexicalReranker | CrossEncoderReranker | None = None
+
+    def score_many(self, query: str, texts: Sequence[str]) -> list[float]:
+        if self._delegate is None:
+            try:
+                candidate = CrossEncoderReranker()
+                scores = candidate.score_many(query, texts)
+                self._delegate = candidate
+                return scores
+            except Exception:  # noqa: BLE001 - any model failure falls back
+                self._delegate = LexicalReranker()
+        return self._delegate.score_many(query, texts)
+
+    def score(self, query: str, text: str) -> float:
+        scores = self.score_many(query, [text])
+        return scores[0] if scores else 0.0
 
 
 def get_reranker():
-    try:
-        reranker = CrossEncoderReranker()
-        reranker._instance()
-        return reranker
-    except Exception:
+    """Cheap, lazy reranker factory: no model is touched until first score."""
+    if os.environ.get("RERANK_DISABLE") == "1":
         return LexicalReranker()
+    return LazyReranker()
 
 
 def rerank_texts(query: str, texts: Sequence[str], reranker=None) -> list[float]:
     reranker = reranker or get_reranker()
+    if hasattr(reranker, "score_many"):
+        return [float(value) for value in reranker.score_many(query, texts)]
     return [float(reranker.score(query, text)) for text in texts]
 
 

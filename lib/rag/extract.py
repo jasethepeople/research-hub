@@ -27,7 +27,7 @@ def extract_pdf(path: Path) -> dict[str, Any]:
         document.close()
     if page_count and _pages_with_text(pages) / page_count < SCAN_THRESHOLD:
         raise ScannedDoc(f"Only {_pages_with_text(pages)}/{page_count} pages have embedded text.")
-    return {"text": "\n\n".join(pages), "n_pages": page_count, "format": "pdf"}
+    return {"text": "\n\n".join(pages), "n_pages": page_count, "pages": pages, "format": "pdf"}
 
 
 def extract_epub(path: Path) -> dict[str, Any]:
@@ -44,7 +44,7 @@ def extract_epub(path: Path) -> dict[str, Any]:
             parts.append(text)
     if not parts:
         raise ScannedDoc("EPUB contained no text documents.")
-    return {"text": "\n\n".join(parts), "n_pages": len(parts), "format": "epub"}
+    return {"text": "\n\n".join(parts), "n_pages": len(parts), "pages": parts, "format": "epub"}
 
 
 def extract_djvu(path: Path) -> dict[str, Any]:
@@ -55,11 +55,12 @@ def extract_djvu(path: Path) -> dict[str, Any]:
     if result.returncode != 0:
         raise UnsupportedFormat(f"djvutxt failed: {result.stderr.strip()[:200]}")
     text = result.stdout
-    return {"text": text, "n_pages": 1, "format": "djvu"}
+    return {"text": text, "n_pages": 1, "pages": [text], "format": "djvu"}
 
 
 def extract_txt(path: Path) -> dict[str, Any]:
-    return {"text": path.read_text(encoding="utf-8", errors="replace"), "n_pages": 1, "format": "txt"}
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return {"text": text, "n_pages": 1, "pages": [text], "format": "txt"}
 
 
 EXTRACTORS = {

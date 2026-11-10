@@ -1,9 +1,11 @@
 import json
+import re
 from pathlib import Path
 
 import httpx
 import pytest
 
+from lib import annas
 from lib.annas import AnnaArchive, ChallengeEncountered, parse_results
 
 FIXTURE = Path(__file__).parent / "fixtures" / "search_page.html"
@@ -161,3 +163,21 @@ def test_search_result_shape_matches_contract():
         assert isinstance(item["title"], str)
         assert isinstance(item["author"], str)
         assert isinstance(item["url"], str)
+
+
+REAL_FIXTURE = Path(__file__).parent / "fixtures" / "search_page_real.html"
+
+
+@pytest.mark.skipif(
+    not REAL_FIXTURE.exists(),
+    reason="real search page not captured yet (see tests/fixtures/REPOINT.md)",
+)
+def test_parse_results_passes_against_real_markup():
+    html = REAL_FIXTURE.read_text(encoding="utf-8", errors="replace")
+    parsed = annas.parse_results(html, limit=50)
+    assert isinstance(parsed, list)
+    assert parsed, "real fixture should yield at least one card"
+    for item in parsed:
+        assert re.fullmatch(r"[0-9a-f]{32}", item["md5"])
+        assert item["title"].strip()
+        assert item["url"].startswith("http")

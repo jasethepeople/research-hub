@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import UTC, datetime
 from typing import Any
 
 from lib.rag import chunk as chunking
@@ -21,6 +22,11 @@ def reindex(
     target_model = model or getattr(embedder, "model_name", "unknown")
     reindexed = 0
     failures: list[dict[str, str]] = []
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    daily_before = connection.execute(
+        "SELECT docs, bytes FROM corpus_daily WHERE day = ?", (today,)
+    ).fetchone()
+    daily_snapshot = (int(daily_before[0]), int(daily_before[1])) if daily_before else (0, 0)
     for document in documents:
         md5 = document["md5"]
         try:
@@ -40,5 +46,12 @@ def reindex(
             reindexed += 1
         except Exception as error:  # noqa: BLE001 - keep going; report per doc
             failures.append({"md5": md5, "error": f"{error.__class__.__name__}: {error}"})
-    assert_model(connection, target_model)
+    if reindexed:
+        assert_model(connection, target_model)
+    with connection:
+        connection.execute(
+            "INSERT INTO corpus_daily (day, docs, bytes) VALUES (?, ?, ?) "
+            "ON CONFLICT(day) DO UPDATE SET docs = ?, bytes = ?",
+            (today, daily_snapshot[0], daily_snapshot[1], daily_snapshot[0], daily_snapshot[1]),
+        )
     return {"reindexed": reindexed, "total": len(documents), "failures": failures}

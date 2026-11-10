@@ -60,11 +60,42 @@ process — not against comments.
 ## Known gaps
 
 - The Anna's Archive fixture is synthesized: the live site is not reachable from cloud IPs, so parser drift against real markup is a standing risk.
+  `tests/fixtures/REPOINT.md` documents the exact capture command and what to verify; `tests/test_annas.py` runs the parser against
+  `search_page_real.html` automatically once a capture is dropped in (skipped until then).
 - The `annas` sign-in stores cookies in-process only; a restart signs in again, and there is no refresh or multi-mirror failover.
 - Vectors live only inside sqlite-vec (no external index); there is no incremental re-embed scheduler (run `tools/reindex.py` manually after model changes).
 - `eval_rag.py` needs a real embedder; with the hash embedder the numbers are meaningful only for regression checks, not quality claims.
 - DjVu extraction shells out to `djvutxt`; without that binary the format is rejected with `UnsupportedFormat` rather than converted.
 - The OCR confidence gate drops low-confidence tokens wholesale; badly scanned pages can produce empty OCR text instead of best-effort output.
-- `INGEST_WINDOWS` uses the host's local timezone and does not wake a stopped host to ingest.
+- `INGEST_WINDOWS` is evaluated in UTC and does not wake a stopped host to ingest; the `ingest-override.json` grace file is
+  advisory and only checked at the start of an ingest.
 - The fetch guard still blocks only IPv4 loopback and link-local ranges (unchanged from the host skeleton); DNS-rebinding mitigation is incomplete.
 - `rag` search result `url` fields use the internal `rag:md5:<hash>` scheme because local corpus documents have no canonical web URL.
+
+## Hardening round (fix/rag-hardening)
+
+- `lib/rag/rerank.py` — F1: `CrossEncoderReranker.score_many(query, texts)` issues one `rerank(query, texts)` call for the whole candidate batch (`rerank_texts` uses it); `.score` remains for single use. F2: `get_reranker()` returns a `LazyReranker` that resolves the cross-encoder on first score, caches it, and falls back to `LexicalReranker` on any failure; `RERANK_DISABLE=1` forces lexical without importing fastembed.
+- `servers/rag_server.py` — F3: `fetch_page`, `search`, `rag_ask`, and `rag_index` are now `async def`; `fetch_url` is awaited directly (no nested `asyncio.run`) and sqlite/embedding work runs in `asyncio.to_thread`.
+- `hub/app.py` — F4: `/api/health` no longer lets `**tiers` clobber reserved keys; the nested `tiers` object always wins and a tier colliding with `tiers`/`cache_ttl`/`tier_meta` is preserved under `tier_meta`.
+- `lib/rag/db.py` — `chunks` gained a `page` column (schema + `ALTER TABLE` migration for existing stores) populated from `add_document(chunk_pages=...)`; `remove_document` was already deleting vectors (test added).
+- `lib/rag/extract.py` — pdf/epub/txt/djvu extractors now return a `pages` list alongside the joined text so per-chunk page numbers are real, not inferred.
+- `lib/rag/ingest.py` — chunk per extracted page and pass `chunk_pages` through to the store; page 1 for whole-file formats.
+- `lib/rag/retrieve.py` — hits carry `page`; `search(..., doc_ids=[...])` scopes every mode (vector SQL, bm25 SQL, and hybrid candidates) to the given md5s or doc_ids.
+- `lib/rag/answer.py` — citations carry `doc_id` and `page`; `llm_complete` retries 429/5xx and transport errors (3 attempts, injectable sleep) and raises `LLMError`; a malformed LLM body degrades to a note instead of raising.
+- `lib/rag/errors.py` — added `LLMError`.
+- `lib/rag/gate.py` — midnight-wrapping windows (`22:00-02:00`) now parse and match correctly; `HUB_STATE/ingest-override.json` (`{"until": <epoch>, "reason": ...}`) temporarily opens ingestion and is ignored once expired.
+- `lib/rag/tools/curate.py` — `import_docs` restores exported `pending_pins` (md5-keyed upsert), so a round-trip carries the pin queue.
+- `lib/rag/tools/reindex.py` — reindex no longer inflates `corpus_daily` (today's counter is restored) and only records the new model identity when at least one document actually re-embedded; failed embedders leave the corpus untouched (resumable).
+- `lib/rag/tools/golden_coverage.py` — per-query `status` (`covered` / `missing`) added under `per_query`.
+- `lib/rag/tools/eval_rag.py` — `load_golden` accepts both `[...]` and `{"queries": [...]}` payloads.
+- `tests/test_rag_rerank.py` — new: one-inference-pass batching, lazy fallback, `RERANK_DISABLE`, and lexical passthrough.
+- `tests/test_rag_audit.py` — new: WAL + vec0 dims, FTS insert/update/delete trigger sync, vector removal on delete, RRF k=60 hand check, doc_ids scoping, guard baseline/force/stale-history + `ShrinkBlocked` numbers, gate windows/midnight wrap/override/expiry/eval lock, hand-computed nDCG/MRR/recall, resumable+idempotent+daily-neutral reindex.
+- `tests/test_rag_server.py` — tools exercised through `asyncio.run`; new proof that an async tool awaiting `fetch_url` inside a running loop does not raise `RuntimeError`.
+- `tests/test_rag_answer.py` — retry-then-succeed, give-up raises `LLMError`, empty-corpus path never calls the LLM, malformed-body degradation, citation `doc_id`/`page`.
+- `tests/test_rag_retrieve.py` — `doc_ids` scoping for md5 and doc_id forms; RRF formula check on synthetic rank lists.
+- `tests/test_rag_core.py` — midnight-wrap windows and override-file tests for the gate.
+- `tests/test_rag_tools.py` — hand-computed metric math, curate pending-pin round-trip, per-query coverage statuses, reindex daily-count neutrality.
+- `tests/test_dropin.py` — new: `literature`, `vulns`, and `localcode` stubs registered under those names load, answer `/api/search`, and show `state ok` in `/api/health` with zero host changes; hub/server source contains none of those names.
+- `tests/test_host.py` — F4 collision test (a tier literally named `tiers`).
+- `tests/test_annas.py` — parser tests parameterized over the synthesized fixture and `search_page_real.html` (skipped until a real capture exists).
+- `tests/fixtures/REPOINT.md` — capture command and checklist for repointing the parser at real Anna's Archive markup.

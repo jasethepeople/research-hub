@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from collections.abc import Callable, Sequence
 from typing import Any
 
 import httpx
 
+from lib.rag.errors import LLMError
 from lib.rag.retrieve import search
 
 SYSTEM_PROMPT = (
@@ -19,6 +21,8 @@ SYSTEM_PROMPT = (
 )
 
 DEFAULT_LLM_MODEL = "local-model"
+LLM_RETRIES = 2
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
 def llm_base_url() -> str:
@@ -33,27 +37,51 @@ def llm_complete(
     model: str | None = None,
     timeout: float = 60.0,
     transport: httpx.BaseTransport | None = None,
+    retries: int = LLM_RETRIES,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> str:
-    """POST one chat completion against an OpenAI-compatible endpoint."""
+    """POST one chat completion against an OpenAI-compatible endpoint.
+
+    Retries on 429/5xx (and transport errors); every other failure or an
+    unusable response body raises LLMError after the retries are spent.
+    """
     base = (base_url or llm_base_url()).rstrip("/")
     if not base:
         raise RuntimeError("no LLM endpoint configured")
     key = api_key if api_key is not None else os.environ.get("LLM_API_KEY", "")
     model_name = model or os.environ.get("LLM_MODEL") or DEFAULT_LLM_MODEL
-    response = httpx.Client(timeout=timeout, transport=transport).post(
-        f"{base}/chat/completions",
-        headers={"Authorization": f"Bearer {key}"} if key else {},
-        json={
-            "model": model_name,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-        },
-    )
-    response.raise_for_status()
-    payload = response.json()
-    return str(payload["choices"][0]["message"]["content"])
+    request = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+    }
+    last_error: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            response = httpx.Client(timeout=timeout, transport=transport).post(
+                f"{base}/chat/completions",
+                headers={"Authorization": f"Bearer {key}"} if key else {},
+                json=request,
+            )
+            if response.status_code in RETRYABLE_STATUS:
+                raise httpx.HTTPStatusError(
+                    f"retryable status {response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
+            response.raise_for_status()
+            payload = response.json()
+            content = payload["choices"][0]["message"]["content"]
+            if not isinstance(content, str):
+                raise LLMError("LLM response content is not a string")
+            return content
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
+            last_error = error
+            if attempt < retries:
+                sleep(0.2 * (attempt + 1))
+    raise LLMError(f"LLM completion failed after {retries + 1} attempt(s): {last_error}") from last_error
 
 
 def build_prompt(question: str, passages: Sequence[dict[str, Any]]) -> str:
@@ -71,6 +99,8 @@ def citations_for(passages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
             "title": passage.get("title", ""),
             "md5": passage.get("md5", ""),
             "chunk_id": passage.get("chunk_id"),
+            "doc_id": passage.get("doc_id", ""),
+            "page": passage.get("page"),
         }
         for index, passage in enumerate(passages, start=1)
     ]

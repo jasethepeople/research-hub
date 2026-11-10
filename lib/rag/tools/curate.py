@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from lib.rag import guard
-from lib.rag.db import add_document, get_document, list_pending_pins, remove_document
+from lib.rag.db import add_document, add_pending_pin, get_document, list_pending_pins, remove_document
 from lib.rag.embed import as_embedder
 
 
@@ -69,7 +69,19 @@ def import_docs(
             embeddings=as_embedder(embedder).encode(chunks),
         )
         imported += 1
-    return {"imported": imported, "skipped_existing": skipped}
+    restored_pins = 0
+    for pin in payload.get("pending_pins", []):
+        md5 = str(pin.get("md5") or pin.get("id") or "")
+        if not md5:
+            continue
+        item = pin.get("item")
+        if not isinstance(item, dict):
+            item = {"md5": md5}
+        if not item.get("md5"):
+            item = {"md5": md5, **item}
+        add_pending_pin(connection, item)
+        restored_pins += 1
+    return {"imported": imported, "skipped_existing": skipped, "pending_pins": restored_pins}
 
 
 def prune_pending(connection: sqlite3.Connection) -> dict[str, Any]:

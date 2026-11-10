@@ -135,7 +135,9 @@ def test_golden_coverage_reports_missing_docs(corpus, tmp_path):
     ]
     report = golden_coverage.coverage(corpus, golden)
     assert report["covered"] == 1
-    assert report["missing"] == [{"question": "absent", "md5": "8" * 32}]
+    assert report["missing"] == [{"question": "absent", "md5": "8" * 32, "status": "missing"}]
+    statuses = {entry["status"] for entry in report["per_query"]}
+    assert statuses == {"covered", "missing"}
 
     golden_path = tmp_path / "golden.json"
     golden_path.write_text(json.dumps(golden), encoding="utf-8")

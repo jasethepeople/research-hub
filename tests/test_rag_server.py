@@ -1,3 +1,4 @@
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -55,7 +56,7 @@ def test_rag_search_finds_primed_document(tmp_path):
     state = tmp_path / "state"
     _prime_corpus(state)
     module = _server_module(state)
-    payload = json.loads(module.search("surface codes depolarizing"))
+    payload = json.loads(asyncio.run(module.search("surface codes depolarizing")))
     assert payload["results"], payload
     assert payload["results"][0]["title"] == "Quantum Error Correction"
     assert payload["results"][0]["tier"] == "rag"
@@ -64,7 +65,7 @@ def test_rag_search_finds_primed_document(tmp_path):
 
 def test_rag_search_empty_corpus_notes_unavailable_or_empty(tmp_path):
     module = _server_module(tmp_path / "fresh-state")
-    payload = json.loads(module.search("anything"))
+    payload = json.loads(asyncio.run(module.search("anything")))
     assert payload["results"] == []
 
 
@@ -74,7 +75,7 @@ def test_rag_ask_with_injected_llm_cites(tmp_path, monkeypatch):
     module = _server_module(state)
     monkeypatch.setattr(module, "get_embedder", lambda: _HashEmbedder())
     monkeypatch.setattr("lib.rag.answer.llm_complete", lambda prompt: "Surface codes help. [1]")
-    payload = json.loads(module.rag_ask("surface codes"))
+    payload = json.loads(asyncio.run(module.rag_ask("surface codes")))
     assert payload["answer"] == "Surface codes help. [1]"
     assert payload["citations"] and payload["citations"][0]["n"] == 1
     assert payload["note"] == ""
@@ -86,7 +87,7 @@ def test_rag_index_ingests_local_file(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "get_embedder", lambda: _HashEmbedder())
     document = tmp_path / "doc.txt"
     document.write_text("direction finding with HF radio bearings", encoding="utf-8")
-    payload = json.loads(module.rag_index(str(document)))
+    payload = json.loads(asyncio.run(module.rag_index(str(document))))
     assert payload["indexed"] is True, payload
     import lib.rag.db as rag_db
 
@@ -110,6 +111,25 @@ def test_rag_index_respects_ingest_windows(tmp_path, monkeypatch):
     monkeypatch.setenv("INGEST_WINDOWS", "03:00-04:00")
     document = tmp_path / "doc.txt"
     document.write_text("some text", encoding="utf-8")
-    payload = json.loads(module.rag_index(str(document)))
+    payload = json.loads(asyncio.run(module.rag_index(str(document))))
     assert payload["indexed"] is False
     assert "window" in payload["note"].lower()
+
+
+def test_async_tools_await_fetch_url_without_runtime_error(tmp_path, monkeypatch):
+    """fetch_page must await fetch_url; a nested asyncio.run would raise inside a live loop."""
+    module = _server_module(tmp_path / "state")
+
+    async def fake_fetch_url(url, internal=False):
+        return {"text": "hello", "bytes": 5, "note": ""}
+
+    monkeypatch.setattr(module, "fetch_url", fake_fetch_url)
+
+    async def scenario():
+        page = json.loads(await module.fetch_page("https://example.invalid/paper"))
+        hits = json.loads(await module.search("surface codes"))
+        return page, hits
+
+    page, hits = asyncio.run(scenario())
+    assert page["text"] == "hello" and page["bytes"] == 5
+    assert hits["results"] == []

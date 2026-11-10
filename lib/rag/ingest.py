@@ -38,6 +38,7 @@ def ingest_document(
         source=str(path),
         text=outcome["text"],
         n_pages=outcome["n_pages"],
+        pages=outcome.get("pages"),
         embedder=embedder,
         model=model,
     )
@@ -74,12 +75,22 @@ def _store(
     source: str,
     text: str,
     n_pages: int,
+    pages: list[str] | None,
     embedder: Any | None,
     model: str,
 ) -> dict[str, Any]:
     if not text.strip():
         return {"indexed": False, "md5": md5, "note": "no text extracted"}
-    chunks = chunking.chunk_text(text)
+    if pages:
+        chunks: list[str] = []
+        chunk_pages: list[int] = []
+        for number, page_text in enumerate(pages, start=1):
+            for chunk in chunking.chunk_text(page_text):
+                chunks.append(chunk)
+                chunk_pages.append(number)
+    else:
+        chunks = chunking.chunk_text(text)
+        chunk_pages = [1] * len(chunks)
     if embedder is None:
         from lib.rag.embed import get_embedder
 
@@ -96,5 +107,6 @@ def _store(
         n_pages=n_pages,
         chunks=chunks,
         embeddings=embeddings,
+        chunk_pages=chunk_pages,
     )
     return {"indexed": True, "md5": md5, "doc_id": doc_id, "chunks": len(chunks), "note": ""}

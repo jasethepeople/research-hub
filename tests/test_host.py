@@ -232,3 +232,23 @@ def test_pin_and_watch_routes_store_only(make_client):
         assert created.status_code == 200
         assert created.json()["query"] == "incident response"
         assert client.get("/api/watch").json()["watches"][0]["id"] == created.json()["id"]
+
+
+def test_health_nested_tiers_wins_and_colliding_names_land_in_tier_meta(make_client):
+    with make_client(stub_config("tiers")) as client:
+        health = client.get("/api/health").json()
+        assert health["tiers"]["tiers"]["state"] == "ok"
+        assert health["tier_meta"]["tiers"]["state"] == "ok"
+        assert health["cache_ttl"] == 900
+        assert "literature" not in health
+
+    with make_client(stub_config("cache_ttl")) as client:
+        health = client.get("/api/health").json()
+        assert health["cache_ttl"] == 900
+        assert health["tiers"]["cache_ttl"]["state"] == "ok"
+        assert health["tier_meta"]["cache_ttl"]["state"] == "ok"
+
+    with make_client(stub_config("plain")) as client:
+        health = client.get("/api/health").json()
+        assert "tier_meta" not in health
+        assert health["plain"]["state"] == "ok"
