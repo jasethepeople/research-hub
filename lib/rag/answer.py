@@ -92,6 +92,20 @@ def build_prompt(question: str, passages: Sequence[dict[str, Any]]) -> str:
     return "\n\n".join(blocks)
 
 
+def format_citation_pages(start: Any = None, end: Any = None) -> str:
+    """Render "p. 12" / "pp. 12\u201313"; empty string when no page is known.
+
+    Tolerates NULL page columns from pre-migration documents: it never emits
+    the string "None" and falls back to a single-page label when only one
+    bound is present.
+    """
+    if start is None:
+        return ""
+    if end is None or end == start:
+        return f"p. {start}"
+    return f"pp. {start}\u2013{end}"
+
+
 def citations_for(passages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
@@ -101,6 +115,8 @@ def citations_for(passages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
             "chunk_id": passage.get("chunk_id"),
             "doc_id": passage.get("doc_id", ""),
             "page": passage.get("page"),
+            "page_end": passage.get("page_end"),
+            "pages": format_citation_pages(passage.get("page"), passage.get("page_end")),
         }
         for index, passage in enumerate(passages, start=1)
     ]

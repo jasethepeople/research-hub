@@ -42,7 +42,8 @@ def search_vector(
     candidate_count = max(limit * 4, 20)
     rows = connection.execute(
         f"""
-        SELECT vec_chunks.rowid AS chunk_id, chunks.doc_id, chunks.idx, chunks.text, chunks.page,
+        SELECT vec_chunks.rowid AS chunk_id, chunks.doc_id, chunks.idx, chunks.text,
+               chunks.page, chunks.page_end,
                corpus.md5, corpus.title,
                1.0 - vec_distance_cosine(vec_chunks.embedding, ?) AS similarity
         FROM vec_chunks
@@ -62,6 +63,7 @@ def search_vector(
             "title": row["title"],
             "idx": row["idx"],
             "page": row["page"] or 1,
+            "page_end": row["page_end"],
             "text": row["text"],
             "score": row["similarity"],
         }
@@ -101,7 +103,7 @@ def search_bm25(
     scope, scope_params = _scope_filter(doc_ids)
     rows = connection.execute(
         f"""
-        SELECT chunks.chunk_id, chunks.doc_id, chunks.idx, chunks.text, chunks.page,
+        SELECT chunks.chunk_id, chunks.doc_id, chunks.idx, chunks.text, chunks.page, chunks.page_end,
                corpus.md5, corpus.title, bm25(chunks_fts) AS rank
         FROM chunks_fts
         JOIN chunks ON chunks.chunk_id = chunks_fts.rowid
@@ -120,6 +122,7 @@ def search_bm25(
             "title": row["title"],
             "idx": row["idx"],
             "page": row["page"] or 1,
+            "page_end": row["page_end"],
             "text": row["text"],
             "score": -row["rank"],
         }

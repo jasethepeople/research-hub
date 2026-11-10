@@ -46,3 +46,13 @@ if [ "$matches" -ne 0 ]; then
   exit 1
 fi
 printf 'mcp_servers.json secret scan: 0 matches\n'
+
+# The configured port must be free before a live-server start. /proc/net/tcp
+# stores ports in hex, so grep the hex form (padded to 4 digits), not decimal.
+hub_port="${HUB_PORT:-8471}"
+hub_port_hex="$(printf '%04X' "$hub_port")"
+if grep -qE ":${hub_port_hex} " /proc/net/tcp /proc/net/tcp6 2>/dev/null; then
+  echo "port ${hub_port} is already bound; refusing live-server start" >&2
+  exit 1
+fi
+printf 'port %s free for live-server start\n' "$hub_port"

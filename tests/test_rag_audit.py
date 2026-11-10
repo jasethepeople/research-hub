@@ -177,9 +177,22 @@ def test_chunks_span_page_breaks_and_carry_start_pages(tmp_path):
     page_one = "Alpha fact one. " * 160 + "The boundary fact begins here and"
     page_two = " continues onto the next page without pause. " + "Beta detail sentence. " * 60
     text = page_one + "\n\n" + page_two
-    chunks, pages = _chunk_with_pages(text, [page_one, page_two])
-    assert len(chunks) == len(pages) >= 2
+    chunks, pages, page_ends = _chunk_with_pages(text, [page_one, page_two])
+    assert len(chunks) == len(pages) == len(page_ends) >= 2
     spanning = [chunk for chunk in chunks if "begins here" in chunk and "next page" in chunk]
     assert spanning, "a window must be able to span the page break"
     assert pages[0] == 1
-    assert max(pages) == 2
+    assert max(page_ends) == 2, "a spanning chunk must record its end page"
+    for start, end in zip(pages, page_ends, strict=False):
+        assert end is not None and end >= start
+
+
+def test_citation_page_rendering_tolerates_null():
+    from lib.rag.answer import format_citation_pages
+
+    assert format_citation_pages(12, 12) == "p. 12"
+    assert format_citation_pages(12, 13) == "pp. 12\u201313"
+    assert format_citation_pages(None, None) == ""
+    assert format_citation_pages(None, 5) == ""
+    label = format_citation_pages(None)
+    assert "None" not in label and label == ""
