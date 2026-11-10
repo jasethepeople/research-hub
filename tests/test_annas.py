@@ -172,12 +172,25 @@ REAL_FIXTURE = Path(__file__).parent / "fixtures" / "search_page_real.html"
     not REAL_FIXTURE.exists(),
     reason="real search page not captured yet (see tests/fixtures/REPOINT.md)",
 )
+@pytest.mark.parametrize("fixture", [FIXTURE, REAL_FIXTURE], ids=["synthesized", "real-gd"])
+def test_parser_fixture_has_valid_results(fixture):
+    html = fixture.read_text(encoding="utf-8", errors="replace")
+    parsed = annas.parse_results(html, limit=50)
+    minimum = 40 if fixture == REAL_FIXTURE else 6
+    assert len(parsed) >= minimum
+    assert all(re.fullmatch(r"[0-9a-f]{32}", item["md5"]) for item in parsed)
+    assert all(item["title"].strip() for item in parsed)
+
+
 def test_parse_results_passes_against_real_markup():
     html = REAL_FIXTURE.read_text(encoding="utf-8", errors="replace")
+    assert len(html) > 20_000, f"real fixture unexpectedly small: {len(html)} bytes"
+    assert re.search(r'href=["\']/md5/[0-9a-fA-F]{32}', html), "expected a stable md5 anchor"
+    assert "DDoS-Guard" not in html and "cf-browser-verification" not in html
     parsed = annas.parse_results(html, limit=50)
     assert isinstance(parsed, list)
-    assert parsed, "real fixture should yield at least one card"
+    assert len(parsed) >= 40, f"real fixture should parse ~50 rows, got {len(parsed)}"
     for item in parsed:
         assert re.fullmatch(r"[0-9a-f]{32}", item["md5"])
         assert item["title"].strip()
-        assert item["url"].startswith("http")
+        assert item["md5"] in item["url"]

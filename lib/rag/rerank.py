@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 from collections.abc import Sequence
 
 BLEND = 0.7
@@ -90,11 +91,24 @@ class LazyReranker:
         return scores[0] if scores else 0.0
 
 
+_SINGLETON: LazyReranker | LexicalReranker | None = None
+_SINGLETON_LOCK = threading.Lock()
+
 def get_reranker():
-    """Cheap, lazy reranker factory: no model is touched until first score."""
+    """Cheap, lazy reranker factory: no model is touched until first score.
+
+    The resolved reranker is a process-wide singleton (behind a lock) so the
+    cross-encoder loads exactly once per process even under concurrent first
+    searches; RERANK_DISABLE=1 forces the lexical reranker.
+    """
+    global _SINGLETON
     if os.environ.get("RERANK_DISABLE") == "1":
         return LexicalReranker()
-    return LazyReranker()
+    if _SINGLETON is None:
+        with _SINGLETON_LOCK:
+            if _SINGLETON is None:
+                _SINGLETON = LazyReranker()
+    return _SINGLETON
 
 
 def rerank_texts(query: str, texts: Sequence[str], reranker=None) -> list[float]:
@@ -107,3 +121,9 @@ def rerank_texts(query: str, texts: Sequence[str], reranker=None) -> list[float]
 def blend_scores(rerank_score: float, retrieval_score: float) -> float:
     """Final score: BLEND weight on the reranker, the rest on retrieval rank."""
     return BLEND * rerank_score + (1.0 - BLEND) * retrieval_score
+
+def reset_reranker_singleton() -> None:
+    """Test hook: drop the process-wide reranker so the next get_reranker() re-resolves."""
+    global _SINGLETON
+    with _SINGLETON_LOCK:
+        _SINGLETON = None

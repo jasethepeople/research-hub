@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     idx INTEGER NOT NULL,
     text TEXT NOT NULL,
     page INTEGER NOT NULL DEFAULT 1,
+    page_end INTEGER,
     UNIQUE(doc_id, idx)
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
@@ -110,7 +111,8 @@ def initialize(connection: sqlite3.Connection) -> None:
     with connection:
         connection.executescript(SCHEMA)
         columns = {row[1] for row in connection.execute("PRAGMA table_info(chunks)").fetchall()}
-        if "page" not in columns:
+        if "page_end" not in columns:
+            connection.execute("ALTER TABLE chunks ADD COLUMN page_end INTEGER")
             connection.execute("ALTER TABLE chunks ADD COLUMN page INTEGER NOT NULL DEFAULT 1")
 
 
@@ -179,6 +181,7 @@ def add_document(
     embeddings: list[list[float]],
     path: str = "",
     chunk_pages: Sequence[int] | None = None,
+    chunk_page_ends: Sequence[int | None] | None = None,
 ) -> str:
     if len(chunks) != len(embeddings):
         raise ValueError("chunks and embeddings must have the same length")
@@ -199,9 +202,15 @@ def add_document(
         pages = list(chunk_pages) if chunk_pages is not None else [1] * len(chunks)
         if len(pages) != len(chunks):
             raise ValueError("chunk_pages must match chunks in length when given")
+        ends = list(chunk_page_ends) if chunk_page_ends is not None else [None] * len(chunks)
+        if len(ends) != len(chunks):
+            raise ValueError("chunk_page_ends must match chunks in length when given")
         connection.executemany(
-            "INSERT INTO chunks (doc_id, idx, text, page) VALUES (?, ?, ?, ?)",
-            [(identifier, index, chunk, pages[index]) for index, chunk in enumerate(chunks)],
+            "INSERT INTO chunks (doc_id, idx, text, page, page_end) VALUES (?, ?, ?, ?, ?)",
+            [
+                (identifier, index, chunk, pages[index], ends[index])
+                for index, chunk in enumerate(chunks)
+            ],
         )
         chunk_rows = connection.execute(
             "SELECT chunk_id FROM chunks WHERE doc_id = ? ORDER BY idx", (identifier,)

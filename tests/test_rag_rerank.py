@@ -89,3 +89,12 @@ def test_blend_weight_unchanged():
     assert BLEND == 0.7
     assert blend_scores(1.0, 0.0) == pytest.approx(0.7)
     assert blend_scores(0.0, 1.0) == pytest.approx(0.3)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_reranker_singleton():
+    from lib.rag import rerank
+
+    rerank.reset_reranker_singleton()
+    yield
+    rerank.reset_reranker_singleton()

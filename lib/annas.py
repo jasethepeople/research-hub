@@ -88,6 +88,114 @@ def parse_details_line(line: str) -> dict[str, str]:
     return details
 
 
+
+class _ResultsTableParser(HTMLParser):
+    """Collect result-table rows as text cells and their links."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.rows: list[list[dict[str, Any]]] = []
+        self._row: list[dict[str, Any]] | None = None
+        self._cell: dict[str, Any] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        tag = tag.lower()
+        if tag == "tr":
+            self._row = []
+        elif tag in {"td", "th"} and self._row is not None:
+            self._cell = {"parts": [], "hrefs": []}
+        elif tag == "a" and self._cell is not None:
+            href = dict(attrs).get("href")
+            if href:
+                self._cell["hrefs"].append(href)
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in {"td", "th"} and self._cell is not None and self._row is not None:
+            self._cell["text"] = _clean(" ".join(self._cell["parts"]))
+            self._row.append(self._cell)
+            self._cell = None
+        elif tag == "tr" and self._row is not None:
+            if self._cell is not None:
+                self._cell["text"] = _clean(" ".join(self._cell["parts"]))
+                self._row.append(self._cell)
+                self._cell = None
+            if self._row:
+                self.rows.append(self._row)
+            self._row = None
+
+    def handle_data(self, data: str) -> None:
+        if self._cell is not None:
+            self._cell["parts"].append(data)
+
+
+def _table_results(html_text: str, limit: int) -> list[dict[str, Any]] | None:
+    if "<table" not in html_text.lower() or "/md5/" not in html_text.lower():
+        return None
+    parser = _ResultsTableParser()
+    try:
+        parser.feed(html_text)
+        parser.close()
+    except Exception:
+        return []
+    candidates = []
+    for row in parser.rows:
+        md5 = ""
+        for cell in row:
+            for href in cell["hrefs"]:
+                match = re.search(r"/md5/([0-9a-fA-F]{32})(?:[/?#]|$)", href)
+                if match:
+                    md5 = match.group(1).lower()
+                    break
+            if md5:
+                break
+        if md5:
+            candidates.append((md5, row))
+    if not candidates:
+        return []
+
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    formats = {
+        "pdf", "epub", "mobi", "azw", "azw3", "djvu", "djv", "txt", "fb2",
+        "cbz", "cbr", "lit", "lrf", "chm", "doc", "docx", "rtf", "html",
+        "htm", "zip", "rar", "pdb", "prc", "tar", "iso", "gz",
+    }
+    year_pattern = re.compile(r"^(?:1[5-9]\d{2}|20\d{2}|21\d{2})$")
+    size_pattern = re.compile(r"^\d+(?:[.,]\d+)?\s*(?:B|KB|MB|GB|TB)$", re.IGNORECASE)
+    language_pattern = re.compile(r"^[a-z]{2,3}(?:-[A-Z]{2})?$")
+    for md5, row in candidates:
+        if md5 in seen:
+            continue
+        linked = [cell["text"] for cell in row if cell["text"] and cell["hrefs"]]
+        title = linked[0] if linked else ""
+        if not title or title == md5:
+            title = next((cell["text"] for cell in row if cell["text"] and cell["text"] != md5), md5)
+        title_index = next((i for i, cell in enumerate(row) if cell["text"] == title), -1)
+        tail = [cell["text"] for cell in row[title_index + 1:] if cell["text"]]
+        author = next((text for text in tail if not year_pattern.fullmatch(text)
+                       and not size_pattern.fullmatch(text)
+                       and text.lower() not in formats
+                       and not language_pattern.fullmatch(text)
+                       and not text.startswith(("📘", "📗", "🚀"))), "")
+        details: dict[str, str] = {}
+        for text in tail:
+            if year_pattern.fullmatch(text):
+                details.setdefault("year", text)
+            elif size_pattern.fullmatch(text):
+                details.setdefault("size", text)
+            elif text.lower() in formats:
+                details.setdefault("format", text.upper())
+            elif language_pattern.fullmatch(text) and len(text) <= 5:
+                details.setdefault("language", text)
+        url = next((href for cell in row for href in cell["hrefs"]
+                    if re.search(rf"/md5/{md5}(?:[/?#]|$)", href, re.IGNORECASE)), f"/md5/{md5}")
+        results.append({"md5": md5, "title": title, "author": author, "url": url, **details})
+        seen.add(md5)
+        if len(results) >= limit:
+            break
+    return results
+
 def parse_results(html_text: str, limit: int = 20) -> list[dict[str, Any]]:
     """Pure parser: anchors href="/md5/<32hex>", inner text is the title, following
     text nodes supply the author and the "language · FORMAT · size · year" line.
@@ -96,6 +204,9 @@ def parse_results(html_text: str, limit: int = 20) -> list[dict[str, Any]]:
     """
     if not isinstance(html_text, str) or limit <= 0:
         return []
+    table_results = _table_results(html_text, limit)
+    if table_results is not None:
+        return table_results
     try:
         parser = _CardParser()
         parser.feed(html_text)

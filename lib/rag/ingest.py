@@ -67,12 +67,13 @@ def ingest_url(
     )
 
 
-def _chunk_with_pages(text: str, pages: list[str] | None) -> tuple[list[str], list[int]]:
+def _chunk_with_pages(text: str, pages: list[str] | None) -> tuple[list[str], list[int], list[int]]:
     """Chunk the WHOLE document so windows span page breaks, then map each chunk
-    to its start page. Chunks never split a fact across an unreachable boundary."""
+    to its start page (and, when it spans a break, its end page). Chunks never
+    split a fact across an unreachable boundary."""
     if not pages:
         chunks = chunking.chunk_text(text)
-        return chunks, [1] * len(chunks)
+        return chunks, [1] * len(chunks), [None] * len(chunks)
     import bisect
     import re
 
@@ -85,6 +86,7 @@ def _chunk_with_pages(text: str, pages: list[str] | None) -> tuple[list[str], li
         cursor += len(page) + 1
     chunks: list[str] = []
     chunk_pages: list[int] = []
+    chunk_page_ends: list[int] = []
     find_from = 0
     for chunk in chunking.chunk_text(norm_text):
         position = norm_text.find(chunk, find_from)
@@ -93,11 +95,14 @@ def _chunk_with_pages(text: str, pages: list[str] | None) -> tuple[list[str], li
         if position >= 0:
             find_from = position + 1
             page_number = bisect.bisect_right(starts, position)
+            end_page = bisect.bisect_right(starts, position + max(len(chunk) - 1, 0))
         else:
             page_number = chunk_pages[-1] if chunk_pages else 1
+            end_page = page_number
         chunks.append(chunk)
         chunk_pages.append(page_number)
-    return chunks, chunk_pages
+        chunk_page_ends.append(max(end_page, page_number))
+    return chunks, chunk_pages, chunk_page_ends
 
 
 def _store(
@@ -114,7 +119,7 @@ def _store(
 ) -> dict[str, Any]:
     if not text.strip():
         return {"indexed": False, "md5": md5, "note": "no text extracted"}
-    chunks, chunk_pages = _chunk_with_pages(text, pages)
+    chunks, chunk_pages, chunk_page_ends = _chunk_with_pages(text, pages)
     if embedder is None:
         from lib.rag.embed import get_embedder
 
@@ -132,5 +137,6 @@ def _store(
         chunks=chunks,
         embeddings=embeddings,
         chunk_pages=chunk_pages,
+        chunk_page_ends=chunk_page_ends,
     )
     return {"indexed": True, "md5": md5, "doc_id": doc_id, "chunks": len(chunks), "note": ""}

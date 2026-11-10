@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import re
 import struct
+import threading
 from collections.abc import Sequence
 
 from lib.rag.db import EMBED_DIM
@@ -69,11 +70,16 @@ class FastEmbedder:
         return vectors
 
 _default: FastEmbedder | None = None
+_DEFAULT_LOCK = threading.Lock()
 
 def default_embedder() -> FastEmbedder:
+    """Process-wide singleton; the lock keeps concurrent first searches from
+    each triggering a model download."""
     global _default
     if _default is None:
-        _default = FastEmbedder()
+        with _DEFAULT_LOCK:
+            if _default is None:
+                _default = FastEmbedder()
     return _default
 
 def hash_embed(texts: Sequence[str]) -> list[list[float]]:
