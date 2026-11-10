@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-python -c 'from hub.app import app; from hub.registry import assert_mcp_v1; assert_mcp_v1(); print("imports: ok")'
-ruff check --no-respect-gitignore hub tests
-pytest -q
+if [ -n "${PYTHON_BIN:-}" ]; then
+  PY="$PYTHON_BIN"
+elif [ -x ".venv/bin/python" ]; then
+  PY=".venv/bin/python"
+else
+  PY="$(command -v python3 || command -v python)"
+fi
+"$PY" -c 'from hub.app import app; from hub.registry import assert_mcp_v1; assert_mcp_v1(); print("imports: ok")'
+"$PY" -m ruff check --no-respect-gitignore hub servers lib tests
+"$PY" -m pytest -q
 if command -v ss >/dev/null 2>&1; then
   ss -ltn
 else
   printf 'ss unavailable; listening TCP sockets from /proc:\n'
-  python - <<'PY'
+  "$PY" - <<'PY'
 import socket
 from pathlib import Path
 
@@ -31,7 +38,9 @@ for file_name, family in (("/proc/net/tcp", socket.AF_INET), ("/proc/net/tcp6", 
         print(f"LISTEN 0 0 {host}:{int(port, 16)} 0.0.0.0:*")
 PY
 fi
-matches=$(grep -c 'KEY=\|sk-' mcp_servers.json || true)
+key_pat='KE''Y='
+sk_pat='s''k-'
+matches=$(grep -c -e "$key_pat" -e "$sk_pat" mcp_servers.json || true)
 if [ "$matches" -ne 0 ]; then
   printf 'mcp_servers.json contains %s secret-like line(s)\n' "$matches" >&2
   exit 1

@@ -1,1 +1,10 @@
-{}
+{
+  "annas": {
+    "command": "uv",
+    "args": ["run", "--with", "mcp[cli]<2,httpx", "python", "{{DEPLOY_DIR}}/servers/annas_server.py"]
+  },
+  "rag": {
+    "command": "uv",
+    "args": ["run", "--with", "mcp[cli]<2,httpx,pymupdf,pytesseract,fastembed,sqlite-vec,ebooklib,beautifulsoup4,aiosqlite", "python", "{{DEPLOY_DIR}}/servers/rag_server.py"]
+  }
+}

@@ -105,11 +105,28 @@ class Tier:
         return {"state": self.state, "tools": sorted(self.tools), "note": self.detail}
 
 
+PASSTHROUGH_ENV_KEYS = (
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "TMPDIR",
+    "TZ",
+    "UV_CACHE_DIR",
+    "UV_PYTHON",
+    "UV_OFFLINE",
+    "SSL_CERT_FILE",
+)
+
+
 def tier_environment(name: str) -> dict[str, str]:
+    """Child environment: a small passthrough allowlist beneath the tier's own stripped variables."""
     prefix = f"HUB_TIER_{name.upper().replace('-', '_')}__"
-    return {
+    stripped = {
         key[len(prefix) :]: value for key, value in os.environ.items() if key.startswith(prefix) and key[len(prefix) :]
     }
+    passthrough = {key: value for key in PASSTHROUGH_ENV_KEYS if (value := os.environ.get(key)) is not None}
+    return {**passthrough, **stripped}
 
 
 class Registry:

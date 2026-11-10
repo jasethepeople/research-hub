@@ -67,6 +67,16 @@ def test_health_always_lists_every_registered_tier(make_client):
         assert health["cache_ttl"] == 900
 
 
+def test_health_mirrors_every_tier_at_top_level_and_keeps_nested_shape(make_client):
+    with make_client(stub_config("literature")) as client:
+        health = client.get("/api/health").json()
+        assert health["tiers"]["literature"] == health["literature"]
+        assert health["literature"]["state"] == "ok"
+        assert health["cache_ttl"] == 900
+
+
+
+
 def test_cache_lru_evicts_at_500_entries():
     cache = ResponseCache(ttl=900, maxsize=500)
     for index in range(500):
@@ -109,8 +119,15 @@ def test_version_guard_exits_2_for_mcp_v2(monkeypatch, capsys):
 def test_tier_secrets_are_scoped_to_the_matching_child(monkeypatch):
     monkeypatch.setenv("HUB_TIER_LITERATURE__API_KEY", "placeholder-secret")
     monkeypatch.setenv("HUB_TIER_VULNS__API_KEY", "another-placeholder")
-    assert tier_environment("literature") == {"API_KEY": "placeholder-secret"}
-    assert tier_environment("local-code") == {}
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    literature = tier_environment("literature")
+    assert literature.items() >= {"API_KEY": "placeholder-secret"}.items()
+    assert "another-placeholder" not in literature.values()
+    assert literature["PATH"] == "/usr/bin:/bin"
+    assert "HOME" in literature
+    local = tier_environment("local-code")
+    assert local.get("API_KEY") is None
+    assert local["PATH"] == "/usr/bin:/bin"
 
 
 def test_fetch_truncates_at_500_kib_and_reports_note(monkeypatch):

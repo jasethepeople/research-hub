@@ -77,7 +77,8 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
     @app.get("/api/health")
     async def health():
         registry: Registry = app.state.registry
-        return {"tiers": registry.health(), "cache_ttl": CACHE_TTL}
+        tiers = registry.health()
+        return {"tiers": tiers, **tiers, "cache_ttl": CACHE_TTL}
 
     @app.get("/api/fetch")
     async def fetch(url: str, internal: bool = False):
