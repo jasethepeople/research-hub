@@ -5,6 +5,8 @@ from pathlib import Path
 
 RAG_SERVER = Path(__file__).resolve().parent.parent / "servers" / "rag_server.py"
 
+from lib.rag.embed import hash_embed  # noqa: E402
+
 
 def _registry() -> dict:
     return {"rag": {"command": sys.executable, "args": [str(RAG_SERVER)]}}
@@ -133,3 +135,35 @@ def test_async_tools_await_fetch_url_without_runtime_error(tmp_path, monkeypatch
     page, hits = asyncio.run(scenario())
     assert page["text"] == "hello" and page["bytes"] == 5
     assert hits["results"] == []
+
+
+def test_embedder_initialization_never_blocks_the_event_loop(tmp_path, monkeypatch):
+    import asyncio
+    import threading
+
+    calls: list[int] = []
+
+    class _SlowEmbedder:
+        model_name = "loop-test"
+
+        def encode(self, texts):
+            return hash_embed(texts)
+
+    def _recording_embedder():
+        calls.append(threading.get_ident())
+        return _SlowEmbedder()
+
+    monkeypatch.setenv("HUB_STATE", str(tmp_path / "state"))
+    fresh = _server_module(tmp_path / "state")
+    monkeypatch.setattr(fresh, "get_embedder", _recording_embedder)
+
+    async def _scenario() -> None:
+        loop_thread = threading.get_ident()
+        await fresh.search("surface codes")
+        await fresh.rag_ask("surface codes")
+        assert calls, "embedder factory must be consulted"
+        assert all(ident != loop_thread for ident in calls), (
+            "get_embedder() ran on the event loop thread; model load would stall the loop"
+        )
+
+    asyncio.run(_scenario())

@@ -79,7 +79,7 @@ process — not against comments.
 - `hub/app.py` — F4: `/api/health` no longer lets `**tiers` clobber reserved keys; the nested `tiers` object always wins and a tier colliding with `tiers`/`cache_ttl`/`tier_meta` is preserved under `tier_meta`.
 - `lib/rag/db.py` — `chunks` gained a `page` column (schema + `ALTER TABLE` migration for existing stores) populated from `add_document(chunk_pages=...)`; `remove_document` was already deleting vectors (test added).
 - `lib/rag/extract.py` — pdf/epub/txt/djvu extractors now return a `pages` list alongside the joined text so per-chunk page numbers are real, not inferred.
-- `lib/rag/ingest.py` — chunk per extracted page and pass `chunk_pages` through to the store; page 1 for whole-file formats.
+- `lib/rag/ingest.py` — chunks now span page breaks via `_chunk_with_pages` (a window may cross a boundary); each chunk records its *start* page and `chunk_pages` is passed through to the store.
 - `lib/rag/retrieve.py` — hits carry `page`; `search(..., doc_ids=[...])` scopes every mode (vector SQL, bm25 SQL, and hybrid candidates) to the given md5s or doc_ids.
 - `lib/rag/answer.py` — citations carry `doc_id` and `page`; `llm_complete` retries 429/5xx and transport errors (3 attempts, injectable sleep) and raises `LLMError`; a malformed LLM body degrades to a note instead of raising.
 - `lib/rag/errors.py` — added `LLMError`.
@@ -88,6 +88,12 @@ process — not against comments.
 - `lib/rag/tools/reindex.py` — reindex no longer inflates `corpus_daily` (today's counter is restored) and only records the new model identity when at least one document actually re-embedded; failed embedders leave the corpus untouched (resumable).
 - `lib/rag/tools/golden_coverage.py` — per-query `status` (`covered` / `missing`) added under `per_query`.
 - `lib/rag/tools/eval_rag.py` — `load_golden` accepts both `[...]` and `{"queries": [...]}` payloads.
+- `tests/test_rag_audit.py` — Part 2 audit: schema/trigger/migration tests, `vec_chunks` cleanup on delete, RRF k=60 and 0.7 blend constants on the live path, `doc_ids` scoping per mode, no-context answer path, LLM retry/`LLMError`/malformed-body degradation, guard numbers, gate windows/override, reindex resumability + daily-counter neutrality, curate pending-pin round-trip, hand-computed nDCG/MRR fixture, golden-coverage statuses, and page-start chunk windows.
+- `tests/test_rag_rerank.py` — F1/F2: `score_many` issues a single inference pass, `LazyReranker` defers model load and falls back to lexical, `RERANK_DISABLE=1` short-circuits.
+- `tests/test_rag_server.py` — F3: async tool contract; an async tool calling `fetch_url` must not raise `RuntimeError`; embedder initialization is proven to happen off the event loop.
+- `tests/test_host.py` — F4: tier named `tiers` survives at top level via `tier_meta`.
+- `tests/test_annas.py` — parser parameterized over the synthesized fixture and `search_page_real.html` (auto-skips until a real capture is dropped in; see `tests/fixtures/REPOINT.md`).
+- `tests/fixtures/REPOINT.md` — capture command and checklist for repointing the parser at real Anna's Archive markup.
 - `tests/test_rag_rerank.py` — new: one-inference-pass batching, lazy fallback, `RERANK_DISABLE`, and lexical passthrough.
 - `tests/test_rag_audit.py` — new: WAL + vec0 dims, FTS insert/update/delete trigger sync, vector removal on delete, RRF k=60 hand check, doc_ids scoping, guard baseline/force/stale-history + `ShrinkBlocked` numbers, gate windows/midnight wrap/override/expiry/eval lock, hand-computed nDCG/MRR/recall, resumable+idempotent+daily-neutral reindex.
 - `tests/test_rag_server.py` — tools exercised through `asyncio.run`; new proof that an async tool awaiting `fetch_url` inside a running loop does not raise `RuntimeError`.

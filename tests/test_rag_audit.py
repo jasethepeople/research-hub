@@ -169,3 +169,17 @@ def test_reindex_is_resumable_and_idempotent_and_neutral_to_daily_counts(corpus)
 
     daily_after = corpus.execute("SELECT docs FROM corpus_daily ORDER BY day").fetchall()
     assert [row[0] for row in daily_after] == [row[0] for row in daily_before]
+
+
+def test_chunks_span_page_breaks_and_carry_start_pages(tmp_path):
+    from lib.rag.ingest import _chunk_with_pages
+
+    page_one = "Alpha fact one. " * 160 + "The boundary fact begins here and"
+    page_two = " continues onto the next page without pause. " + "Beta detail sentence. " * 60
+    text = page_one + "\n\n" + page_two
+    chunks, pages = _chunk_with_pages(text, [page_one, page_two])
+    assert len(chunks) == len(pages) >= 2
+    spanning = [chunk for chunk in chunks if "begins here" in chunk and "next page" in chunk]
+    assert spanning, "a window must be able to span the page break"
+    assert pages[0] == 1
+    assert max(pages) == 2

@@ -67,6 +67,39 @@ def ingest_url(
     )
 
 
+def _chunk_with_pages(text: str, pages: list[str] | None) -> tuple[list[str], list[int]]:
+    """Chunk the WHOLE document so windows span page breaks, then map each chunk
+    to its start page. Chunks never split a fact across an unreachable boundary."""
+    if not pages:
+        chunks = chunking.chunk_text(text)
+        return chunks, [1] * len(chunks)
+    import bisect
+    import re
+
+    normalized = [re.sub(r"\s+", " ", page).strip() for page in pages]
+    norm_text = " ".join(normalized)
+    starts: list[int] = []
+    cursor = 0
+    for page in normalized:
+        starts.append(cursor)
+        cursor += len(page) + 1
+    chunks: list[str] = []
+    chunk_pages: list[int] = []
+    find_from = 0
+    for chunk in chunking.chunk_text(norm_text):
+        position = norm_text.find(chunk, find_from)
+        if position < 0:
+            position = norm_text.find(chunk)
+        if position >= 0:
+            find_from = position + 1
+            page_number = bisect.bisect_right(starts, position)
+        else:
+            page_number = chunk_pages[-1] if chunk_pages else 1
+        chunks.append(chunk)
+        chunk_pages.append(page_number)
+    return chunks, chunk_pages
+
+
 def _store(
     connection: sqlite3.Connection,
     *,
@@ -81,16 +114,7 @@ def _store(
 ) -> dict[str, Any]:
     if not text.strip():
         return {"indexed": False, "md5": md5, "note": "no text extracted"}
-    if pages:
-        chunks: list[str] = []
-        chunk_pages: list[int] = []
-        for number, page_text in enumerate(pages, start=1):
-            for chunk in chunking.chunk_text(page_text):
-                chunks.append(chunk)
-                chunk_pages.append(number)
-    else:
-        chunks = chunking.chunk_text(text)
-        chunk_pages = [1] * len(chunks)
+    chunks, chunk_pages = _chunk_with_pages(text, pages)
     if embedder is None:
         from lib.rag.embed import get_embedder
 
