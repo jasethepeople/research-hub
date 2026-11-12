@@ -30,5 +30,6 @@ class EvalLocked(RuntimeError):
 class UnsupportedFormat(RuntimeError):
     """The file format has no available extractor."""
 
+
 class LLMError(RuntimeError):
     """The configured LLM endpoint failed after retries (or answered unusably)."""

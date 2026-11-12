@@ -189,22 +189,25 @@ def add_document(
         raise ValueError(f"embeddings must have exactly {EMBED_DIM} dimensions")
     identifier = doc_id_for(md5)
     now = time.time()
+    pages = list(chunk_pages) if chunk_pages is not None else [1] * len(chunks)
+    if len(pages) != len(chunks):
+        raise ValueError("chunk_pages must match chunks in length when given")
+    ends = list(chunk_page_ends) if chunk_page_ends is not None else [None] * len(chunks)
+    if len(ends) != len(chunks):
+        raise ValueError("chunk_page_ends must match chunks in length when given")
     with connection:
+        existing = connection.execute("SELECT 1 FROM corpus WHERE doc_id = ?", (identifier,)).fetchone()
         connection.execute(
             "DELETE FROM vec_chunks WHERE rowid IN (SELECT chunk_id FROM chunks WHERE doc_id = ?)",
             (identifier,),
         )
+        connection.execute("DELETE FROM chunks WHERE doc_id = ?", (identifier,))
+        connection.execute("DELETE FROM corpus WHERE doc_id = ?", (identifier,))
         connection.execute(
             "INSERT INTO corpus (doc_id, md5, title, source, path, text, n_pages, n_chunks, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (identifier, md5, title, source, path, text, n_pages, len(chunks), now),
         )
-        pages = list(chunk_pages) if chunk_pages is not None else [1] * len(chunks)
-        if len(pages) != len(chunks):
-            raise ValueError("chunk_pages must match chunks in length when given")
-        ends = list(chunk_page_ends) if chunk_page_ends is not None else [None] * len(chunks)
-        if len(ends) != len(chunks):
-            raise ValueError("chunk_page_ends must match chunks in length when given")
         connection.executemany(
             "INSERT INTO chunks (doc_id, idx, text, page, page_end) VALUES (?, ?, ?, ?, ?)",
             [
@@ -219,12 +222,13 @@ def add_document(
             "INSERT INTO vec_chunks (rowid, embedding) VALUES (?, ?)",
             [(row[0], _serialize(vector)) for row, vector in zip(chunk_rows, embeddings, strict=True)],
         )
-        day = datetime.fromtimestamp(now, UTC).strftime("%Y-%m-%d")
-        connection.execute(
-            "INSERT INTO corpus_daily (day, docs, bytes) VALUES (?, 1, ?) "
-            "ON CONFLICT(day) DO UPDATE SET docs = docs + 1, bytes = bytes + ?",
-            (day, len(text), len(text)),
-        )
+        if not existing:
+            day = datetime.fromtimestamp(now, UTC).strftime("%Y-%m-%d")
+            connection.execute(
+                "INSERT INTO corpus_daily (day, docs, bytes) VALUES (?, 1, ?) "
+                "ON CONFLICT(day) DO UPDATE SET docs = docs + 1, bytes = bytes + ?",
+                (day, len(text), len(text)),
+            )
     return identifier
 
 

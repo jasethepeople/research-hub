@@ -14,14 +14,16 @@ def title_key(title: str) -> str:
     return "".join(character for character in title.lower() if character.isalnum())[:60]
 
 
-async def _search_tier(tier: Tier, cache: ResponseCache, query: str, timeout: float) -> dict[str, Any]:
-    cache_key = (tier.name, normalize_query(query))
+async def _search_tier(
+    tier: Tier, cache: ResponseCache, query: str, timeout: float, fetch_limit: int
+) -> dict[str, Any]:
+    cache_key = (tier.name, normalize_query(query), str(fetch_limit))
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     async def invoke():
-        value = await tier.call("search", {"query": query, "limit": 20})
+        value = await tier.call("search", {"query": query, "limit": fetch_limit})
         if isinstance(value, str):
             value = json.loads(value)
         if not isinstance(value, dict) or not isinstance(value.get("results"), list):
@@ -49,8 +51,9 @@ async def search_all(
     registry: Registry, cache: ResponseCache, query: str, limit: int, timeout: float
 ) -> dict[str, Any]:
     tiers = list(registry.tiers.values())
+    fetch_limit = max(limit, 20)
     gathered = await asyncio.gather(
-        *(_search_tier(tier, cache, query, timeout) for tier in tiers),
+        *(_search_tier(tier, cache, query, timeout, fetch_limit) for tier in tiers),
         return_exceptions=True,
     )
     notes: dict[str, dict[str, str]] = {}
@@ -58,6 +61,16 @@ async def search_all(
 
     for tier, outcome in zip(tiers, gathered, strict=True):
         if isinstance(outcome, BaseException):
+            if isinstance(outcome, TimeoutError):
+                # A timeout is transient: record it, but leave the tier's
+                # state alone so one slow search doesn't mark it degraded.
+                # (asyncio.TimeoutError is TimeoutError on Python 3.11+.)
+                note = f"{outcome.__class__.__name__}: {outcome}"
+                if not str(outcome):
+                    note = outcome.__class__.__name__
+                tier.detail = note
+                notes[tier.name] = {"state": tier.state, "note": note}
+                continue
             if tier.session is not None:
                 tier.state = "degraded"
             note = f"{outcome.__class__.__name__}: {outcome}"

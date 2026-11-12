@@ -16,9 +16,10 @@ def _tesseract_present() -> bool:
 
 
 def test_ocr_pdf_requires_tesseract(tmp_path, monkeypatch):
-    import shutil
+    def _missing(*args, **kwargs):
+        raise pytesseract.TesseractNotFoundError()
 
-    monkeypatch.setattr(shutil, "which", lambda name: None)
+    monkeypatch.setattr(pytesseract, "get_tesseract_version", _missing)
     empty = tmp_path / "empty.pdf"
     import fitz
 

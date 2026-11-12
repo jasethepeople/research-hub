@@ -42,7 +42,7 @@ async def search(query: str, limit: int = 20) -> str:
     def _work() -> list[dict[str, Any]]:
         connection = _open()
         try:
-            return retrieve.search(connection, query, mode="hybrid_rerank", limit=limit, embedder=get_embedder())
+            return retrieve.search(connection, query, mode="hybrid", limit=limit, embedder=get_embedder())
         finally:
             connection.close()
 

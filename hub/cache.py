@@ -11,9 +11,9 @@ class ResponseCache:
     def __init__(self, ttl: int = CACHE_TTL, maxsize: int = CACHE_MAXSIZE):
         self.ttl = ttl
         self.maxsize = maxsize
-        self._items: OrderedDict[tuple[str, str], tuple[float, Any]] = OrderedDict()
+        self._items: OrderedDict[tuple[str, ...], tuple[float, Any]] = OrderedDict()
 
-    def get(self, key: tuple[str, str]) -> Any | None:
+    def get(self, key: tuple[str, ...]) -> Any | None:
         entry = self._items.get(key)
         if entry is None:
             return None
@@ -24,7 +24,7 @@ class ResponseCache:
         self._items.move_to_end(key)
         return deepcopy(value)
 
-    def put(self, key: tuple[str, str], value: Any):
+    def put(self, key: tuple[str, ...], value: Any):
         self._items[key] = (time.monotonic() + self.ttl, deepcopy(value))
         self._items.move_to_end(key)
         while len(self._items) > self.maxsize:

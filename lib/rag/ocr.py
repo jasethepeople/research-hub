@@ -75,6 +75,8 @@ def ocr_pdf(
 
     payload = {"text": "\n\n".join(pages), "n_pages": n_pages, "format": "pdf-ocr", "dpi": dpi}
     if cache_dir is not None:
+        payload["cache_path"] = str(cache_path(path, cache_dir))
+    if cache_dir is not None:
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_path(path, cache_dir).write_text(json.dumps(payload), encoding="utf-8")
     return payload

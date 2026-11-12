@@ -43,4 +43,4 @@ select = ["E", "F", "I", "UP", "B"]
 hub = ["index.html"]
 
 [tool.setuptools.packages.find]
-include = ["hub*"]
+include = ["hub*", "lib*"]

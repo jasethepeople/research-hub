@@ -96,23 +96,33 @@ def test_guard_blocks_shrink_past_24h_baseline(corpus):
 
 
 def test_gate_windows_and_eval_lock(tmp_path, monkeypatch):
+    monkeypatch.setenv("HUB_STATE", str(tmp_path))
     monkeypatch.setenv("INGEST_WINDOWS", "")
-    allowed, _ = gate.can_ingest()
+    allowed, _ = gate.can_ingest(now=mktime_utc(12, 0))
     assert allowed
     monkeypatch.setenv("INGEST_WINDOWS", "00:00-23:59")
-    allowed, _ = gate.can_ingest()
+    allowed, _ = gate.can_ingest(now=mktime_utc(12, 0))
     assert allowed
     monkeypatch.setenv("INGEST_WINDOWS", "23:00-23:30")
-    allowed, reason = gate.can_ingest()
+    allowed, reason = gate.can_ingest(now=mktime_utc(12, 0))
     assert not allowed and reason
 
-    monkeypatch.setenv("HUB_STATE", str(tmp_path))
     with gate.eval_lock():
         with pytest.raises(EvalLocked):
             with gate.eval_lock():
                 pass
 
-def test_gate_supports_midnight_wrap_windows(monkeypatch):
+def test_can_ingest_refuses_outside_window(tmp_path, monkeypatch):
+    monkeypatch.delenv("INGEST_WINDOWS", raising=False)
+    monkeypatch.setenv("HUB_STATE", str(tmp_path))
+    noon = datetime(2026, 1, 1, 12, 0, tzinfo=UTC).timestamp()
+    allowed, note = gate.can_ingest(now=noon, spec="23:00-23:30")
+    assert allowed is False
+    assert "23:00-23:30" in note
+
+
+def test_gate_supports_midnight_wrap_windows(tmp_path, monkeypatch):
+    monkeypatch.setenv("HUB_STATE", str(tmp_path))
     monkeypatch.setenv("INGEST_WINDOWS", "")
     from lib.rag import gate
 

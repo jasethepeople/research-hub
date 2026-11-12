@@ -40,6 +40,7 @@ def search_vector(
     probe = _serialize(vector)
     scope, scope_params = _scope_filter(doc_ids)
     candidate_count = max(limit * 4, 20)
+    k = candidate_count * 4
     rows = connection.execute(
         f"""
         SELECT vec_chunks.rowid AS chunk_id, chunks.doc_id, chunks.idx, chunks.text,
@@ -53,7 +54,7 @@ def search_vector(
         ORDER BY distance
         LIMIT ?
         """,
-        (probe, probe, candidate_count, *scope_params, candidate_count),
+        (probe, probe, k, *scope_params, candidate_count),
     ).fetchall()
     return [
         {
@@ -175,18 +176,13 @@ def search(
         raise ValueError(f"unknown retrieval mode: {mode}")
     if embedder is None:
         raise ValueError("hybrid modes require an embedder")
-    vector_hits = search_vector(connection, query, limit, embedder, doc_ids)
-    bm25_hits = search_bm25(connection, query, limit, doc_ids)
-    fused = _reciprocal_rank_fusion([vector_hits, bm25_hits], limit)
+    candidate_limit = RERANK_CANDIDATES if mode == "hybrid_rerank" else limit
+    vector_hits = search_vector(connection, query, candidate_limit, embedder, doc_ids)
+    bm25_hits = search_bm25(connection, query, candidate_limit, doc_ids)
+    fused = _reciprocal_rank_fusion([vector_hits, bm25_hits], candidate_limit)
     if mode == "hybrid":
         return fused
-    candidates = _reciprocal_rank_fusion(
-        [
-            search_vector(connection, query, RERANK_CANDIDATES, embedder, doc_ids),
-            search_bm25(connection, query, RERANK_CANDIDATES, doc_ids),
-        ],
-        RERANK_CANDIDATES,
-    )
+    candidates = fused
     texts = [hit["text"] for hit in candidates]
     rerank_scores = rerank_texts(query, texts, reranker)
     top_score = max((hit["score"] for hit in candidates), default=1.0) or 1.0

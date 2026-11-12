@@ -116,6 +116,7 @@ PASSTHROUGH_ENV_KEYS = (
     "UV_PYTHON",
     "UV_OFFLINE",
     "SSL_CERT_FILE",
+    "HUB_STATE",
 )
 
 

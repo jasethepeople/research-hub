@@ -15,6 +15,7 @@ def _path_env(name: str, default: str) -> Path:
 class Settings:
     deploy_dir: Path = DEPLOY_DIR
     state_dir: Path = field(default_factory=lambda: _path_env("HUB_STATE", DEFAULT_STATE_DIR))
+    host: str = field(default_factory=lambda: os.environ.get("HUB_HOST", "127.0.0.1"))
     port: int = field(default_factory=lambda: int(os.environ.get("HUB_PORT", str(DEFAULT_PORT))))
     tier_timeout: float = field(default_factory=lambda: float(os.environ.get("HUB_TIER_TIMEOUT", "12")))
     fourth_pane: bool = field(default_factory=lambda: os.environ.get("HUB_FOURTH_PANE", "0") == "1")

@@ -28,20 +28,30 @@ next search.
 
 ## 2. The dashboard (three panes, maybe four)
 
-The page has exactly three panes:
+The page has a search form on top and exactly three panes below it. The
+panes are by tier, not by function — each tier's results land in the pane its
+name matches:
 
-1. **Search** — query box and merged results from every registered tier.
-2. **Health** — per-tier state (`ok`, `degraded`, `skipped`, `absent`), notes,
-   and the cache TTL (900 s).
-3. **Pins** — items you've saved, with delete buttons.
+1. **Literature** — tiers named like literature, papers, books, archives, or
+   journals.
+2. **Vulnerabilities** — tiers named like vulnerabilities, CVEs, or security.
+3. **Local code** — tiers named like code, repos, or local.
 
-A fourth pane exists behind `HUB_FOURTH_PANE=1` (set it before starting the
-host if you want it). Everything the dashboard shows is also available as JSON
-(see below), so you can script everything.
+A tier that matches no pane lands in Literature unless the fourth pane is
+enabled. Health is shown inside each pane as a per-tier status dot and state
+(`ok`, `degraded`, `skipped`, `absent`), with notes; the full picture is
+available as JSON from `/api/health`, including the cache TTL (900 s).
+
+Pins are API-only: there is no pins pane on the dashboard. Pin, list, and
+delete through `/api/pin` and `/api/pins` (see §5).
+
+A fourth pane ("Other tiers") exists behind `HUB_FOURTH_PANE=1` (set it
+before starting the host if you want it). Everything the dashboard shows is
+also available as JSON (see below), so you can script everything.
 
 ## 3. Search across tiers
 
-**In the browser:** type into the search pane and press enter.
+**In the browser:** type into the search form at the top and press enter.
 
 **From the command line / scripts:**
 
@@ -103,11 +113,11 @@ curl -s -X POST http://127.0.0.1:8471/api/pin \
 # list pins
 curl -s http://127.0.0.1:8471/api/pins
 
-# delete pin number 3
-curl -s -X DELETE http://127.0.0.1:8471/api/pin/3
+# delete a pin by its id (the `id` field returned by POST /api/pin)
+curl -s -X DELETE http://127.0.0.1:8471/api/pin/<id>
 ```
 
-The dashboard's pins pane reflects all of this immediately.
+Pins are stored server-side and listed by `GET /api/pins`; there is no pins pane on the dashboard.
 
 ## 6. The Anna's Archive tier
 

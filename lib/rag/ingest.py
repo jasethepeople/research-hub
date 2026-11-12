@@ -22,6 +22,7 @@ def ingest_document(
     embedder: Any = None,
     title: str = "",
     model: str = "",
+    md5: str | None = None,
 ) -> dict[str, Any]:
     """Ingest a local file; raises ScannedDoc when OCR is required."""
     if not gate.can_ingest()[0]:
@@ -30,7 +31,7 @@ def ingest_document(
         connection = db.connect()
         db.initialize(connection)
     outcome = extract.extract_text(path)
-    doc_md5 = hashlib.md5(path.read_bytes()).hexdigest()
+    doc_md5 = md5 or hashlib.md5(path.read_bytes()).hexdigest()
     return _store(
         connection,
         md5=doc_md5,
@@ -64,6 +65,7 @@ def ingest_url(
         embedder=embedder,
         title=title or Path(downloaded["path"]).name,
         model=model,
+        md5=doc_md5,
     )
 
 

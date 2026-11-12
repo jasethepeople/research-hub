@@ -1,4 +1,5 @@
 import asyncio
+import socket
 from datetime import UTC, datetime, timedelta
 
 import mcp
@@ -45,9 +46,13 @@ def test_bad_tiers_do_not_fail_or_block_good_tier(make_client):
         assert response.status_code == 200
         body = response.json()
         assert body["results"][0]["tier"] == "good"
-        for name in ("raises", "sleeps", "exits"):
+        for name in ("raises", "exits"):
             assert body["notes"][name]["state"] == "degraded"
             assert body["notes"][name]["note"]
+        # A timeout is transient: the tier keeps its prior state, but the
+        # note records the timeout.
+        assert body["notes"]["sleeps"]["state"] == "ok"
+        assert "TimeoutError" in body["notes"]["sleeps"]["note"]
 
 
 def test_dedupe_keeps_first_registry_tier_and_records_other(make_client):
@@ -214,10 +219,13 @@ def test_fetch_strips_scripts_and_rejects_non_text(monkeypatch):
 
 
 def test_loopback_fetch_is_refused_without_internal_flag(make_client):
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        free_port = probe.getsockname()[1]
     with make_client({}) as client:
         response = client.get("/api/fetch", params={"url": "http://127.0.0.1:8471/"})
         assert response.status_code == 403
-        allowed = client.get("/api/fetch", params={"url": "http://127.0.0.1:8471/", "internal": "true"})
+        allowed = client.get("/api/fetch", params={"url": f"http://127.0.0.1:{free_port}/", "internal": "true"})
         assert allowed.status_code == 502
 
 

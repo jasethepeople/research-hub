@@ -7,11 +7,11 @@ instead of crashing the MCP session.
 
 from __future__ import annotations
 
+from lib.rag.errors import RagUnavailable
+
 CORE_MODULES = ("sqlite_vec", "fitz", "ebooklib", "bs4", "aiosqlite")
 
-
-class RagUnavailable(RuntimeError):
-    """Raised when a RAG feature needs an optional dependency that is missing."""
+__all__ = ["CORE_MODULES", "RagUnavailable", "available", "missing_modules", "require"]
 
 
 def missing_modules() -> list[str]:

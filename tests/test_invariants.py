@@ -65,7 +65,8 @@ def _iter_source_lines(paths):
             yield path, number, line
 
 
-def test_i1_only_loopback_listens(monkeypatch, tmp_path):
+@pytest.mark.parametrize("host_env", [None, "127.0.0.1"], ids=["default-host", "explicit-loopback"])
+def test_i1_only_loopback_listens(monkeypatch, tmp_path, host_env):
     if not Path("/proc/net/tcp").exists():
         pytest.skip("Linux TCP tables unavailable")
     with socket.socket() as probe:
@@ -78,6 +79,9 @@ def test_i1_only_loopback_listens(monkeypatch, tmp_path):
         "HUB_STATE": str(tmp_path / "state"),
         "HUB_MCP_SERVERS": str(empty_registry),
     }
+    expected_host = "127.0.0.1"
+    if host_env is not None:
+        env["HUB_HOST"] = host_env
     process = subprocess.Popen(
         [sys.executable, "-m", "hub"],
         cwd=REPO,
@@ -111,7 +115,7 @@ def test_i1_only_loopback_listens(monkeypatch, tmp_path):
                     raw = b"".join(raw[index : index + 4][::-1] for index in range(0, 16, 4))
                     listeners.append(socket.inet_ntop(socket.AF_INET6, raw))
         assert listeners, "expected the hub listener to be visible"
-        assert set(listeners) == {"127.0.0.1"}, listeners
+        assert set(listeners) == {expected_host}, listeners
     finally:
         process.terminate()
         process.wait(timeout=10)

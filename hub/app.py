@@ -102,26 +102,26 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
     async def pin(request: PinRequest):
         store: Store = app.state.store
         try:
-            return store.pin(request.item, request.expires_at)
+            return await asyncio.to_thread(store.pin, request.item, request.expires_at)
         except OverflowError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
 
     @app.get("/api/pins")
     async def pins():
         store: Store = app.state.store
-        return {"pins": store.list_pins()}
+        return {"pins": await asyncio.to_thread(store.list_pins)}
 
     @app.delete("/api/pin/{pin_id}")
     async def unpin(pin_id: str):
         store: Store = app.state.store
-        if not store.unpin(pin_id):
+        if not await asyncio.to_thread(store.unpin, pin_id):
             raise HTTPException(status_code=404, detail="Pin not found.")
         return {"deleted": True, "id": pin_id}
 
     @app.get("/api/watch")
     async def watches():
         store: Store = app.state.store
-        return {"watches": store.list_watches()}
+        return {"watches": await asyncio.to_thread(store.list_watches)}
 
     @app.post("/api/watch")
     async def add_watch(request: WatchRequest):
@@ -129,7 +129,7 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
         query = request.query.strip()
         if not query:
             raise HTTPException(status_code=422, detail="query must not be blank")
-        return store.add_watch(query)
+        return await asyncio.to_thread(store.add_watch, query)
 
     return app
 
@@ -141,4 +141,4 @@ def main():
     assert_mcp_v1()
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=DEFAULT_SETTINGS.port, log_level="info")
+    uvicorn.run(app, host=DEFAULT_SETTINGS.host, port=DEFAULT_SETTINGS.port, log_level="info")

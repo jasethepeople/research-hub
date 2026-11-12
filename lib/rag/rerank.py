@@ -122,6 +122,7 @@ def blend_scores(rerank_score: float, retrieval_score: float) -> float:
     """Final score: BLEND weight on the reranker, the rest on retrieval rank."""
     return BLEND * rerank_score + (1.0 - BLEND) * retrieval_score
 
+
 def reset_reranker_singleton() -> None:
     """Test hook: drop the process-wide reranker so the next get_reranker() re-resolves."""
     global _SINGLETON
