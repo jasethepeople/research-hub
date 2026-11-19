@@ -20,6 +20,7 @@ class TierSpec(BaseModel):
 
     command: str
     args: list[str] = Field(default_factory=list)
+    category: str = ""
 
 
 class Tier:
@@ -28,6 +29,7 @@ class Tier:
         self.spec = spec
         self.state = state
         self.detail = detail
+        self.category = (spec.category if spec else "") or ""
         self.tools: set[str] = set()
         self._stack: AsyncExitStack | None = None
         self.session: ClientSession | None = None
@@ -102,7 +104,7 @@ class Tier:
         return None
 
     def health(self) -> dict[str, Any]:
-        return {"state": self.state, "tools": sorted(self.tools), "note": self.detail}
+        return {"state": self.state, "tools": sorted(self.tools), "note": self.detail, "category": self.category}
 
 
 PASSTHROUGH_ENV_KEYS = (

@@ -65,13 +65,24 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
         return HTMLResponse(DASHBOARD_HTML.replace("__FOURTH_PANE__", "true" if settings.fourth_pane else "false"))
 
     @app.get("/api/search")
-    async def search(query: str = Query(min_length=1), limit: int = Query(default=20, ge=1, le=100)):
+    async def search(
+        query: str = Query(min_length=1),
+        limit: int = Query(default=20, ge=1, le=100),
+        tiers: str = Query(default=""),
+    ):
         cleaned_query = query.strip()
         if not cleaned_query:
             raise HTTPException(status_code=422, detail="query must not be blank")
         registry: Registry = app.state.registry
         cache: ResponseCache = app.state.cache
-        response = await search_all(registry, cache, cleaned_query, limit, settings.tier_timeout)
+        response = await search_all(
+            registry,
+            cache,
+            cleaned_query,
+            limit,
+            settings.tier_timeout,
+            only={name.strip() for name in tiers.split(",") if name.strip()} if tiers else None,
+        )
         return response
 
     @app.get("/api/health")

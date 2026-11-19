@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib.tierbase import PinBoard, fetch_page
 
-PROVIDERS = ("openlibrary", "internetarchive", "arxiv", "crossref", "libgen", "scihub")
+PROVIDERS = ("openlibrary", "internetarchive", "arxiv", "crossref", "libgen", "scihub", "nvd", "exploitdb", "osv", "github", "gitlab", "npm", "huggingface", "softwareheritage", "apkmirror")
 
 
 def main() -> None:

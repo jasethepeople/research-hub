@@ -61,9 +61,12 @@ def _interleave(per_tier: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
 
 
 async def search_all(
-    registry: Registry, cache: ResponseCache, query: str, limit: int, timeout: float
+    registry: Registry, cache: ResponseCache, query: str, limit: int, timeout: float,
+    only: set[str] | None = None,
 ) -> dict[str, Any]:
     tiers = list(registry.tiers.values())
+    if only:
+        tiers = [tier for tier in tiers if tier.name in only] or tiers
     gathered = await asyncio.gather(
         *(_search_tier(tier, cache, query, timeout) for tier in tiers),
         return_exceptions=True,
