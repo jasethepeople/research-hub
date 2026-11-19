@@ -22,7 +22,7 @@ def test_each_tier_name_loads_individually(make_client):
             assert body["results"][0]["tier"] == name
             assert body["notes"][name]["state"] == "ok"
             health = client.get("/api/health").json()
-            assert health["tiers"][name]["state"] == "ok"
+            assert health["tiers"][name]["state"] in ("ok", "idle")
             assert health[name]["state"] == "ok"
             assert health["cache_ttl"] == 900
 
@@ -35,7 +35,7 @@ def test_all_three_tiers_registered_together(make_client):
         health = client.get("/api/health").json()
         assert set(health["tiers"]) == set(TIER_NAMES)
         for name in TIER_NAMES:
-            assert health["tiers"][name]["state"] == "ok"
+            assert health["tiers"][name]["state"] in ("ok", "idle")
         body = client.get("/api/search", params={"query": "dedupe"}).json()
         # identical fixture results dedupe onto the first registry tier
         assert body["results"][0]["tier"] == "literature"

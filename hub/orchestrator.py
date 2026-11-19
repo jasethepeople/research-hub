@@ -14,11 +14,23 @@ def title_key(title: str) -> str:
     return "".join(character for character in title.lower() if character.isalnum())[:60]
 
 
-async def _search_tier(tier: Tier, cache: ResponseCache, query: str, timeout: float) -> dict[str, Any]:
+async def _search_tier(
+    tier: Tier, cache: ResponseCache, query: str, timeout: float, deploy_dir
+) -> dict[str, Any]:
     cache_key = (tier.name, normalize_query(query))
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
+
+    if tier.session is None and tier.spec is not None:
+        startup_timeout = max(timeout, 30.0)
+        try:
+            await asyncio.wait_for(tier.connect(deploy_dir), timeout=startup_timeout)
+        except TimeoutError:
+            tier.state = "degraded"
+            tier.detail = f"MCP startup timed out after {startup_timeout:g} seconds."
+            await tier.close()
+            raise RuntimeError(tier.detail) from None
 
     async def invoke():
         value = await tier.call("search", {"query": query, "limit": 20})
@@ -30,14 +42,15 @@ async def _search_tier(tier: Tier, cache: ResponseCache, query: str, timeout: fl
         for item in value["results"]:
             if not isinstance(item, dict) or not isinstance(item.get("title"), str):
                 raise ValueError("each search result must include a string title")
-            results.append(
-                {
-                    "title": item["title"],
-                    "author": str(item.get("author") or ""),
-                    "url": str(item.get("url") or ""),
-                    "tier": tier.name,
-                }
-            )
+            mapped = {
+                "title": item["title"],
+                "author": str(item.get("author") or ""),
+                "url": str(item.get("url") or ""),
+                "tier": tier.name,
+            }
+            if item.get("snippet"):
+                mapped["snippet"] = str(item["snippet"])
+            results.append(mapped)
         return {"results": results, "note": str(value.get("note") or "")}
 
     response = await asyncio.wait_for(invoke(), timeout=timeout)
@@ -68,7 +81,7 @@ async def search_all(
     if only:
         tiers = [tier for tier in tiers if tier.name in only] or tiers
     gathered = await asyncio.gather(
-        *(_search_tier(tier, cache, query, timeout) for tier in tiers),
+        *(_search_tier(tier, cache, query, timeout, registry.deploy_dir) for tier in tiers),
         return_exceptions=True,
     )
     notes: dict[str, dict[str, str]] = {}

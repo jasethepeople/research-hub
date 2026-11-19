@@ -6,8 +6,8 @@ from typing import Any
 from lib.providers.http import get
 
 API = "https://api.osv.dev/v1/vulns"
-ID_PATTERN = re.compile(r"^(CVE-\d{4}-\d{4,}|GHSA-[A-Za-z0-9-]{6,}|OSV-[A-Za-z0-9-]+|PYSEC-\d{4}-\d+|MAL-\w{4,})$", re.IGNORECASE)
-
+ID_PATTERN = re.compile(r"^(CVE-\d{4}-\d{4,}|GHSA-[A-Za-z0-9-]{6,}|OSV-[A-Za-z0-9-]+|PYSEC-\d{4}-\d+|MAL-\w{4,})$",
+    re.IGNORECASE)
 
 def search(query: str, limit: int = 20) -> dict[str, Any]:
     token = query.strip().upper()

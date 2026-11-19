@@ -166,17 +166,10 @@ class Registry:
     async def start(self) -> None:
         if not self.tiers and not self.load_note:
             self.load()
-
-        async def connect_one(tier: Tier) -> None:
-            startup_timeout = max(self.timeout, 5.0)
-            try:
-                await asyncio.wait_for(tier.connect(self.deploy_dir), timeout=startup_timeout)
-            except TimeoutError:
-                tier.state = "degraded"
-                tier.detail = f"MCP startup timed out after {startup_timeout:g} seconds."
-                await tier.close()
-
-        await asyncio.gather(*(connect_one(tier) for tier in self.tiers.values()))
+        for tier in self.tiers.values():
+            if tier.session is None and tier.spec is not None:
+                tier.state = "idle"
+                tier.detail = "spawns on first search"
 
     async def close(self) -> None:
         await asyncio.gather(*(tier.close() for tier in self.tiers.values()))

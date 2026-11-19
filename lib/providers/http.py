@@ -9,7 +9,7 @@ POLITE_UA = "ResearchHub/0.1 (mailto:research-hub@users.noreply.github.com)"
 
 
 def get(url: str, *, params: dict | None = None, pairs: list | None = None,
-        headers: dict | None = None, timeout: float = 25.0, retries: int = 2) -> httpx.Response:
+        headers: dict | None = None, timeout: float = 25.0, retries: int = 2, polite: bool = True) -> httpx.Response:
     if pairs:
         base = str(httpx.QueryParams(params or {}))
         extra = "&".join(
@@ -17,7 +17,7 @@ def get(url: str, *, params: dict | None = None, pairs: list | None = None,
         )
         url = f"{url}?{base}&{extra}" if base else f"{url}?{extra}"
         params = None
-    merged = {"User-Agent": BROWSER_UA}
+    merged = {"User-Agent": POLITE_UA if polite else BROWSER_UA}
     if headers:
         merged.update(headers)
     attempt = 0

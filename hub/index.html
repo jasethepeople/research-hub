@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Local Research Hub</title>
 <style>
-:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e8ecf0;background:#10151b;font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-width:980px}header{padding:24px 28px 18px;border-bottom:1px solid #27313c;background:#151d26}h1{margin:0 0 14px;font-size:22px;letter-spacing:.01em}form{display:flex;gap:10px;max-width:780px}input{flex:1;min-width:0;padding:11px 13px;border:1px solid #3b4855;border-radius:7px;background:#0e141a;color:#f4f6f8;font-size:15px}button{padding:0 18px;border:0;border-radius:7px;background:#91c8ff;color:#102033;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.meta{margin:10px 0 0;color:#9eabb8;font-size:12px}.panes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:18px 20px}.pane{min-height:300px;padding:15px;border:1px solid #2c3742;border-radius:10px;background:#151d26;overflow-wrap:anywhere}.pane h2{margin:0 0 11px;font-size:16px}.statuses{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 13px}.tierchip{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border-radius:99px;background:#202a34;color:#c6d0da;font-size:11px}.dot{width:8px;height:8px;border-radius:50%;background:#707d89;display:inline-block}.dot.ok{background:#58d68d}.dot.degraded{background:#f4c95d}.dot.skipped,.dot.absent{background:#f07878}.error{display:none;margin:0 0 12px;padding:9px;border-left:3px solid #f07878;background:#2b2023;color:#ffb7b7;font-size:12px}.error.visible{display:block}.result{padding:11px 0;border-top:1px solid #2c3742}.result a{color:#a8d6ff;font-weight:650;text-decoration:none}.result a:hover{text-decoration:underline}.byline{margin-top:4px;color:#9eabb8;font-size:12px}.empty{color:#82909d;font-size:13px;padding:8px 0}.also{color:#82909d;font-size:11px;margin-top:4px}
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e8ecf0;background:#10151b;font-synthesis:none}*{box-sizing:border-box}body{margin:0;min-width:980px}header{padding:24px 28px 18px;border-bottom:1px solid #27313c;background:#151d26}h1{margin:0 0 14px;font-size:22px;letter-spacing:.01em}form{display:flex;gap:10px;max-width:780px}input{flex:1;min-width:0;padding:11px 13px;border:1px solid #3b4855;border-radius:7px;background:#0e141a;color:#f4f6f8;font-size:15px}button{padding:0 18px;border:0;border-radius:7px;background:#91c8ff;color:#102033;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.meta{margin:10px 0 0;color:#9eabb8;font-size:12px}.panes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:18px 20px}.pane{min-height:300px;padding:15px;border:1px solid #2c3742;border-radius:10px;background:#151d26;overflow-wrap:anywhere}.pane h2{margin:0 0 11px;font-size:16px}.statuses{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 13px}.tierchip{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border-radius:99px;background:#202a34;color:#c6d0da;font-size:11px}.dot{width:8px;height:8px;border-radius:50%;background:#707d89;display:inline-block}.dot.ok{background:#58d68d}.dot.degraded{background:#f4c95d}.dot.skipped,.dot.absent{background:#f07878}.dot.idle{background:#8fa5ba}.error{display:none;margin:0 0 12px;padding:9px;border-left:3px solid #f07878;background:#2b2023;color:#ffb7b7;font-size:12px}.error.visible{display:block}.result{padding:11px 0;border-top:1px solid #2c3742}.result a{color:#a8d6ff;font-weight:650;text-decoration:none}.result a:hover{text-decoration:underline}.byline{margin-top:4px;color:#9eabb8;font-size:12px}.empty{color:#82909d;font-size:13px;padding:8px 0}.also{color:#82909d;font-size:11px;margin-top:4px}.snippet{margin-top:4px;color:#b9c4cf;font-size:12px;line-height:1.45}
 #tierbar{display:flex;align-items:center;gap:8px;margin:14px 0 0;flex-wrap:wrap}
 .tabbtn{padding:7px 14px;border:1px solid #3b4855;border-radius:99px;background:#0e141a;color:#c6d0da;font-size:13px;font-weight:600;cursor:pointer}
 .tabbtn.active{background:#91c8ff;border-color:#91c8ff;color:#102033}
@@ -31,8 +31,8 @@ label.pick.on{border-color:#91c8ff;color:#e8ecf0;background:#16283a}
 </header>
 <main id="panes" class="panes"></main>
 <script>
-const CATEGORY_TITLES = {library: "Library", code: "Code", vulns: "Vulnerabilities"};
-const CATEGORY_ORDER = ["library", "code", "vulns"];
+const CATEGORY_TITLES = {library: "Library", code: "Code", vulns: "Vulnerabilities", general: "General"};
+const CATEGORY_ORDER = ["library", "code", "vulns", "general"];
 let tierInfo = [];           // [{name, category, state}]
 let checked = new Set();     // tier names included in searches
 let activeTab = "library";
@@ -98,8 +98,9 @@ function showResults(results, notes) {
       const url = esc(safeUrl);
       const author = item.author ? ` · ${esc(item.author)}` : "";
       const also = item.also_on?.length ? `<div class="also">Also on: ${item.also_on.map(esc).join(", ")}</div>` : "";
+      const snippet = item.snippet ? `<div class="snippet">${esc(item.snippet)}</div>` : "";
       const link = url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>` : title;
-      return `<article class="result">${link}<div class="byline">${esc(item.tier)}${author}</div>${also}</article>`;
+      return `<article class="result">${link}<div class="byline">${esc(item.tier)}${author}</div>${also}${snippet}</article>`;
     }).join("") : '<div class="empty">No results in this pane.</div>';
   }
 }

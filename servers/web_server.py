@@ -14,7 +14,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib.tierbase import PinBoard, fetch_page
 
-PROVIDERS = ("openlibrary", "internetarchive", "arxiv", "crossref", "libgen", "scihub", "nvd", "exploitdb", "osv", "github", "gitlab", "npm", "huggingface", "softwareheritage", "apkmirror")
+PROVIDERS = (
+    "openlibrary", "internetarchive", "arxiv", "crossref", "libgen", "scihub",
+    "nvd", "exploitdb", "osv", "github", "gitlab", "npm", "huggingface",
+    "apkmirror", "openalex", "pubmed", "europemc", "doaj",
+    "standardebooks", "librivox", "crates", "rubygems", "maven", "packagist",
+    "dockerhub", "flathub", "aur", "fdroid", "cisa-kev", "ghadvisories",
+    "metasploit", "wikipedia", "stackexchange", "hackernews",
+)
 
 
 def main() -> None:
@@ -22,7 +29,7 @@ def main() -> None:
     if name not in PROVIDERS:
         print(f"unknown provider: {name!r}; expected one of {PROVIDERS}", file=sys.stderr)
         raise SystemExit(2)
-    provider = importlib.import_module(f"lib.providers.{name}")
+    provider = importlib.import_module(f"lib.providers.{name.replace(chr(45), chr(95))}")
     board = PinBoard(name)
 
     def search(query: str, limit: int = 20) -> str:
