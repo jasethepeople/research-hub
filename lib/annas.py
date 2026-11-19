@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-DEFAULT_MIRROR = "https://annas-archive.gd"
+DEFAULT_MIRROR = "https://annas-archive.li"
 CACHE_TTL = 900
 CACHE_MAX_ENTRIES = 200
 DOWNLOAD_CAP = 250 * 1024 * 1024
@@ -295,7 +295,11 @@ class AnnaArchive:
             cookies=self.cookies,
             timeout=httpx.Timeout(30.0),
             follow_redirects=True,
-            headers={"User-Agent": "ResearchHub-annas-tier/0.1"},
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+                )
+            },
         )
 
     def sign_in(self, client: httpx.Client) -> None:
@@ -337,6 +341,10 @@ class AnnaArchive:
             return cached
         with self.client() as client:
             if not self.signed_in:
+                if not self.key:
+                    # Unauthenticated /search is gated sitewide (DDoS-Guard style); a
+                    # membership key is required for the sign-in path to ever pass.
+                    return {"results": [], "note": "no ANNAS_KEY configured; set HUB_TIER_ANNAS__ANNAS_KEY"}
                 try:
                     self.sign_in(client)
                 except (ChallengeEncountered, httpx.HTTPError) as error:

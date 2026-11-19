@@ -45,6 +45,21 @@ async def _search_tier(tier: Tier, cache: ResponseCache, query: str, timeout: fl
     return response
 
 
+def _interleave(per_tier: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Round-robin the tiers' result lists so no single tier dominates the merged feed."""
+    merged: list[dict[str, Any]] = []
+    position = 0
+    while True:
+        added = False
+        for tier_results in per_tier:
+            if position < len(tier_results):
+                merged.append(tier_results[position])
+                added = True
+        if not added:
+            return merged
+        position += 1
+
+
 async def search_all(
     registry: Registry, cache: ResponseCache, query: str, limit: int, timeout: float
 ) -> dict[str, Any]:
@@ -55,6 +70,7 @@ async def search_all(
     )
     notes: dict[str, dict[str, str]] = {}
     merged: dict[str, dict[str, Any]] = {}
+    per_tier: list[list[dict[str, Any]]] = []
 
     for tier, outcome in zip(tiers, gathered, strict=True):
         if isinstance(outcome, BaseException):
@@ -70,6 +86,7 @@ async def search_all(
             tier.state = "ok"
             tier.detail = ""
         notes[tier.name] = {"state": tier.state, "note": outcome["note"] or tier.detail}
+        deduped: list[dict[str, Any]] = []
         for item in outcome["results"]:
             key = title_key(item["title"])
             if key in merged:
@@ -78,5 +95,7 @@ async def search_all(
                     other_tiers.append(tier.name)
                 continue
             merged[key] = {**item, "also_on": []}
+            deduped.append(merged[key])
+        per_tier.append(deduped)
 
-    return {"results": list(merged.values())[:limit], "notes": notes}
+    return {"results": _interleave(per_tier)[:limit], "notes": notes}

@@ -3,6 +3,30 @@
     "command": "uv",
     "args": ["run", "--with", "mcp[cli]<2,httpx", "python", "{{DEPLOY_DIR}}/servers/annas_server.py"]
   },
+  "libgen": {
+    "command": "uv",
+    "args": ["run", "--with", "mcp[cli]<2,httpx", "python", "{{DEPLOY_DIR}}/servers/web_server.py", "libgen"]
+  },
+  "scihub": {
+    "command": "uv",
+    "args": ["run", "--with", "mcp[cli]<2,httpx", "python", "{{DEPLOY_DIR}}/servers/web_server.py", "scihub"]
+  },
+  "openlibrary": {
+    "command": "uv",
+    "args": ["run", "--with", "mcp[cli]<2,httpx", "python", "{{DEPLOY_DIR}}/servers/web_server.py", "openlibrary"]
+  },
+  "internetarchive": {
+    "command": "uv",
+    "args": ["run", "--with", "mcp[cli]<2,httpx", "python", "{{DEPLOY_DIR}}/servers/web_server.py", "internetarchive"]
+  },
+  "arxiv": {
+    "command": "uv",
+    "args": ["run", "--with", "mcp[cli]<2,httpx", "python", "{{DEPLOY_DIR}}/servers/web_server.py", "arxiv"]
+  },
+  "crossref": {
+    "command": "uv",
+    "args": ["run", "--with", "mcp[cli]<2,httpx", "python", "{{DEPLOY_DIR}}/servers/web_server.py", "crossref"]
+  },
   "rag": {
     "command": "uv",
     "args": ["run", "--with", "mcp[cli]<2,httpx,pymupdf,pytesseract,fastembed,sqlite-vec,ebooklib,beautifulsoup4,aiosqlite", "python", "{{DEPLOY_DIR}}/servers/rag_server.py"]
