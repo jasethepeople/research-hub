@@ -12,6 +12,7 @@ from hub.config import DEFAULT_SETTINGS, Settings
 from hub.dashboard import DASHBOARD_HTML
 from hub.downloads import DownloadManager, DownloadRequest
 from hub.fetch import TIMEOUT_SECONDS, FetchError, fetch_url
+from hub.orchestrator import prewarm as prewarm_tiers
 from hub.orchestrator import search_all
 from hub.registry import Registry, assert_mcp_v1
 from hub.storage import Store
@@ -46,6 +47,9 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
         app.state.cache = ResponseCache(ttl=CACHE_TTL, maxsize=500)
         downloads = DownloadManager(settings.state_dir)
         app.state.downloads = downloads
+        app.state.prewarm_task = asyncio.create_task(
+            prewarm_tiers(registry, settings.deploy_dir)
+        )
 
         async def sweep_loop():
             while True:

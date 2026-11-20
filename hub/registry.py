@@ -33,6 +33,13 @@ class Tier:
         self.tools: set[str] = set()
         self._stack: AsyncExitStack | None = None
         self.session: ClientSession | None = None
+        self._connect_lock = asyncio.Lock()
+
+    async def connect_once(self, deploy_dir: Path, timeout: float = 90.0) -> None:
+        async with self._connect_lock:
+            if self.session is not None or self.spec is None or self.state == "absent":
+                return
+            await asyncio.wait_for(self.connect(deploy_dir), timeout=timeout)
 
     async def connect(self, deploy_dir: Path) -> None:
         if self.spec is None:
@@ -44,9 +51,9 @@ class Tier:
                 self.state = "absent"
                 self.detail = f"Server file does not exist: {path}"
                 return
-        self._stack = AsyncExitStack()
+        stack = AsyncExitStack()
         try:
-            read_stream, write_stream = await self._stack.enter_async_context(
+            read_stream, write_stream = await stack.enter_async_context(
                 stdio_client(
                     StdioServerParameters(
                         command=self.spec.command,
@@ -55,25 +62,28 @@ class Tier:
                     )
                 )
             )
-            self.session = await self._stack.enter_async_context(ClientSession(read_stream, write_stream))
-            await self.session.initialize()
-            response = await self.session.list_tools()
-            self.tools = {tool.name for tool in response.tools}
-            missing = REQUIRED_TOOLS - self.tools
+            session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
+            await session.initialize()
+            response = await session.list_tools()
+            tools = {tool.name for tool in response.tools}
+            missing = REQUIRED_TOOLS - tools
             if missing:
                 self.state = "degraded"
                 self.detail = "Missing tools: " + ", ".join(sorted(missing))
             else:
                 self.state = "ok"
                 self.detail = ""
+            self._stack = stack
+            self.session = session
+            self.tools = tools
         except FileNotFoundError as error:
             self.state = "skipped"
             self.detail = f"Could not start server: {error}"
-            await self.close()
+            await stack.aclose()
         except Exception as error:
             self.state = "degraded"
             self.detail = f"MCP startup failed: {error.__class__.__name__}: {error}"
-            await self.close()
+            await stack.aclose()
 
     async def close(self) -> None:
         if self._stack is not None:

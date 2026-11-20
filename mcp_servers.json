@@ -586,7 +586,8 @@
     ],
     "tools": [
       "search"
-    ]
+    ],
+    "categories": []
   },
   "usgs-topo": {
     "category": "maps",
@@ -718,21 +719,6 @@
       "python",
       "{{DEPLOY_DIR}}/servers/web_server.py",
       "osintdir"
-    ],
-    "tools": [
-      "search"
-    ]
-  },
-  "threed": {
-    "category": "craft",
-    "command": "uv",
-    "args": [
-      "run",
-      "--with",
-      "mcp[cli]<2,httpx",
-      "python",
-      "{{DEPLOY_DIR}}/servers/web_server.py",
-      "threed"
     ],
     "tools": [
       "search"

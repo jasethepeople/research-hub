@@ -14,6 +14,9 @@ def title_key(title: str) -> str:
     return "".join(character for character in title.lower() if character.isalnum())[:60]
 
 
+_STARTUP_SEM = asyncio.Semaphore(6)
+
+
 async def _search_tier(
     tier: Tier, cache: ResponseCache, query: str, timeout: float, deploy_dir
 ) -> dict[str, Any]:
@@ -23,10 +26,11 @@ async def _search_tier(
         return cached
 
     if tier.session is None and tier.spec is not None:
-        startup_timeout = max(timeout, 30.0)
         try:
-            await asyncio.wait_for(tier.connect(deploy_dir), timeout=startup_timeout)
+            async with _STARTUP_SEM:
+                await tier.connect_once(deploy_dir, timeout=max(timeout, 90.0))
         except TimeoutError:
+            startup_timeout = max(timeout, 90.0)
             tier.state = "degraded"
             tier.detail = f"MCP startup timed out after {startup_timeout:g} seconds."
             await tier.close()
@@ -117,3 +121,17 @@ async def search_all(
         per_tier.append(deduped)
 
     return {"results": _interleave(per_tier)[:limit], "notes": notes}
+
+
+async def prewarm(registry: Registry, deploy_dir: Any) -> None:
+    """Connect every tier in the background, a few at a time, so first searches are fast."""
+
+    async def warm(tier: Tier) -> None:
+        try:
+            async with _STARTUP_SEM:
+                await tier.connect_once(deploy_dir, timeout=90.0)
+        except Exception:  # noqa: BLE001 - prewarm is best effort
+            await tier.close()
+
+    await asyncio.gather(*(warm(tier) for tier in registry.tiers.values()))
+
