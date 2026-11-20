@@ -50,6 +50,8 @@ async def _search_tier(
             }
             if item.get("snippet"):
                 mapped["snippet"] = str(item["snippet"])
+            if item.get("link"):
+                mapped["link"] = str(item["link"])
             results.append(mapped)
         return {"results": results, "note": str(value.get("note") or "")}
 

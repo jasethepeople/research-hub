@@ -15,6 +15,20 @@ label.pick input{accent-color:#91c8ff;margin:0}
 label.pick.on{border-color:#91c8ff;color:#e8ecf0;background:#16283a}
 .mini{padding:6px 10px;border:1px solid #3b4855;border-radius:7px;background:transparent;color:#9eabb8;font-size:11px;font-weight:600;cursor:pointer}
 .mini:hover{color:#e8ecf0}
+.dl{padding:2px 9px;border:1px solid #3b4855;border-radius:6px;background:transparent;color:#91c8ff;font-size:12px;font-weight:700;cursor:pointer;margin-left:8px}
+.dl:hover{border-color:#91c8ff}
+.dlall{margin-left:10px}
+.dlrow{display:flex;align-items:baseline}
+#dlpanel{position:fixed;right:16px;bottom:16px;width:430px;max-height:55vh;overflow:auto;padding:14px;border:1px solid #3b4855;border-radius:10px;background:#151d26;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#dlpanel.hidden{display:none}
+#dlpanel h3{margin:0 0 10px;font-size:14px}
+.dljob{padding:8px 0;border-top:1px solid #2c3742;font-size:12px}
+.dljob .t{color:#e8ecf0;font-weight:650}
+.dljob .s{color:#9eabb8}
+.dljob a{color:#a8d6ff;text-decoration:none}
+.dljob button{padding:2px 8px;font-size:11px;font-weight:600}
+.thumb{display:block;max-width:280px;max-height:190px;margin:6px 0 2px;border-radius:6px;border:1px solid #2c3742;object-fit:cover;background:#0e141a}
+video.thumb{width:280px;height:160px}
 </style>
 </head>
 <body>
@@ -26,13 +40,15 @@ label.pick.on{border-color:#91c8ff;color:#e8ecf0;background:#16283a}
   <span id="checks" class="checks"></span>
   <button type="button" class="mini" id="allbtn">All</button>
   <button type="button" class="mini" id="nonebtn">None</button>
+  <button type="button" class="mini" id="dlbtn">&#10515; Downloads</button>
 </div>
 <p class="meta">Local-only host · check tiers to include them in the search (nothing checked = search everything).</p>
 </header>
+<aside id="dlpanel" class="hidden"><h3>Downloads</h3><div id="dljobs"><div class="empty">No downloads yet.</div></div></aside>
 <main id="panes" class="panes"></main>
 <script>
-const CATEGORY_TITLES = {library: "Library", code: "Code", vulns: "Vulnerabilities", general: "General"};
-const CATEGORY_ORDER = ["library", "code", "vulns", "general"];
+const CATEGORY_TITLES = {library: "Library", code: "Code", vulns: "Vulnerabilities", general: "General", media: "Pictures & Video"};
+const CATEGORY_ORDER = ["library", "code", "vulns", "media", "general"];
 let tierInfo = [];           // [{name, category, state}]
 let checked = new Set();     // tier names included in searches
 let activeTab = "library";
@@ -71,9 +87,10 @@ function renderTabsAndChecks() {
 function renderPanes() {
   panesEl.style.gridTemplateColumns = `repeat(${Math.min(categories().length, 3)},minmax(0,1fr))`;
   panesEl.innerHTML = categories().map(cat =>
-    `<section class="pane" data-pane="${cat}"><h2>${esc(CATEGORY_TITLES[cat] || cat)}</h2><div class="statuses"></div><div class="error"></div><div class="results"><div class="empty">Search to begin.</div></div></section>`).join("");
+    `<section class="pane" data-pane="${cat}"><h2><span class="dlrow">${esc(CATEGORY_TITLES[cat] || cat)}<button type="button" class="mini dlall">&#10515; all</button></span></h2><div class="statuses"></div><div class="error"></div><div class="results"><div class="empty">Search to begin.</div></div></section>`).join("");
 }
 function showResults(results, notes) {
+  window._results = results;
   for (const pane of panesEl.querySelectorAll(".pane")) {
     const category = pane.dataset.pane;
     const tierNames = tierInfo.filter(t => (t.category || "other") === category).map(t => t.name);
@@ -87,7 +104,7 @@ function showResults(results, notes) {
       ? failures.map(name => `${name}: ${(notes[name] || {}).note || (notes[name] || {}).state}`).join(" · ")
       : "";
     error.classList.toggle("visible", failures.length > 0);
-    const items = results.filter(item => {
+    const items = results.map((item, idx) => ({...item, _i: idx})).filter(item => {
       const t = tierInfo.find(x => x.name === item.tier);
       return t && (t.category || "other") === category;
     });
@@ -100,7 +117,14 @@ function showResults(results, notes) {
       const also = item.also_on?.length ? `<div class="also">Also on: ${item.also_on.map(esc).join(", ")}</div>` : "";
       const snippet = item.snippet ? `<div class="snippet">${esc(item.snippet)}</div>` : "";
       const link = url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>` : title;
-      return `<article class="result">${link}<div class="byline">${esc(item.tier)}${author}</div>${also}${snippet}</article>`;
+      const direct = /^https?:\/\//i.test(item.link || "") ? item.link : "";
+      const isVideo = /\.(mp4|webm|ogg)(\?|$)/i.test(direct) || /archive\.org\/download\/.+\.mp4/.test(direct);
+      const thumb = isVideo
+        ? `<video class="thumb" src="${esc(direct)}" controls preload="metadata"></video>`
+        : (direct ? `<a href="${url || esc(direct)}" target="_blank" rel="noopener noreferrer"><img class="thumb" src="${esc(direct)}" loading="lazy" alt=""></a>` : "");
+      const dlUrl = direct || url;
+      const dlbtn = dlUrl ? `<button type="button" class="dl" data-i="${item._i}" title="Download">&#10515;</button>` : "";
+      return `<article class="result">${thumb}<span class="dlrow">${link}${dlbtn}</span><div class="byline">${esc(item.tier)}${author}</div>${also}${snippet}</article>`;
     }).join("") : '<div class="empty">No results in this pane.</div>';
   }
 }
@@ -147,6 +171,65 @@ document.querySelector("#nonebtn").addEventListener("click", () => { checked = n
   renderPanes();
   renderTabsAndChecks();
 })();
+
+const dlPanel = document.querySelector("#dlpanel");
+const dlJobsEl = document.querySelector("#dljobs");
+let dlPoll = null;
+function enqueue(items) {
+  fetch("/api/download", {method: "POST", headers: {"Content-Type": "application/json", Accept: "application/json"},
+    body: JSON.stringify({items})}).then(r => r.json()).then(d => {
+    if (d.enqueued) { openDrawer(); refreshDownloads(); }
+    if (d.errors && d.errors.length) alert(d.errors.join("\n"));
+  }).catch(() => alert("Download request failed."));
+}
+async function refreshDownloads() {
+  try {
+    const data = await (await fetch("/api/downloads", {headers:{Accept:"application/json"}})).json();
+    const jobs = data.jobs || [];
+    document.querySelector("#dlbtn").textContent = "\u10515 Downloads (" + jobs.filter(j => j.status === "queued" || j.status === "running").length + ")";
+    dlJobsEl.innerHTML = jobs.length ? jobs.map(j => {
+      const size = j.bytes ? (j.bytes > 1048576 ? (j.bytes/1048576).toFixed(1) + " MB" : Math.round(j.bytes/1024) + " KB") : "";
+      const status = j.status === "done" ? (j.filename ? '<a href="/api/download/file/' + j.id + '">save</a>' + (size ? " " + size : "") : "done")
+        : j.status === "error" ? '<span class="s">' + esc(j.error || "failed") + "</span>"
+        : j.status;
+      const rm = '<button type="button" class="mini dlrm" data-id="' + j.id + '">x</button>';
+      return '<div class="dljob"><div class="t">' + esc(j.title || j.url) + " " + rm + '</div><div class="s">' + esc(j.tier || "") + " · " + status + "</div></div>";
+    }).join("") : '<div class="empty">No downloads yet.</div>';
+    for (const btn of dlJobsEl.querySelectorAll(".dlrm")) btn.addEventListener("click", () => {
+      fetch("/api/download/" + btn.dataset.id, {method: "DELETE"}).then(() => refreshDownloads());
+    });
+    if (!dlPanel.classList.contains("hidden") || jobs.some(j => j.status === "queued" || j.status === "running")) {
+      if (!dlPoll) dlPoll = setTimeout(() => { dlPoll = null; refreshDownloads(); }, 2000);
+    }
+  } catch (e) {}
+}
+function openDrawer() { dlPanel.classList.remove("hidden"); refreshDownloads(); }
+document.addEventListener("click", event => {
+  const dl = event.target.closest(".dl");
+  if (dl) {
+    const item = (window._results || [])[Number(dl.dataset.i)];
+    if (item && item.url) enqueue([{url: item.url, title: item.title, tier: item.tier, resolve: !(item.link && /^https?:\/\//i.test(item.link))}]);
+    return;
+  }
+  const all = event.target.closest(".dlall");
+  if (all) {
+    const pane = all.closest(".pane");
+    const cat = pane ? pane.dataset.pane : null;
+    const items = (window._results || []).filter(item => {
+      const t = tierInfo.find(x => x.name === item.tier);
+      return item.url && t && (t.category || "other") === cat;
+    }).map(item => ({url: item.url, title: item.title, tier: item.tier, resolve: !(item.link && /^https?:\/\//i.test(item.link))}));
+    if (items.length) enqueue(items);
+    else alert("No downloadable results in this pane.");
+    return;
+  }
+  if (event.target.closest("#dlbtn")) {
+    if (dlPanel.classList.contains("hidden")) openDrawer();
+    else { dlPanel.classList.add("hidden"); refreshDownloads(); }
+  }
+});
+document.querySelector("#search-form").addEventListener("submit", () => { setTimeout(refreshDownloads, 300); });
+refreshDownloads();
 </script>
 </body>
 </html>

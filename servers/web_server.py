@@ -21,6 +21,7 @@ PROVIDERS = (
     "standardebooks", "librivox", "crates", "rubygems", "maven", "packagist",
     "dockerhub", "flathub", "aur", "fdroid", "cisa-kev", "ghadvisories",
     "metasploit", "wikipedia", "stackexchange", "hackernews",
+    "wikimedia", "artic", "openverse", "ia-video", "metmuseum", "smithsonian",
 )
 
 
@@ -40,7 +41,13 @@ def main() -> None:
                 {"results": [], "note": f"{error.__class__.__name__}: {error}"}, ensure_ascii=False
             )
         results = [
-            {"title": str(item["title"]), "author": str(item.get("author") or ""), "url": str(item.get("url") or "")}
+            {
+                "title": str(item["title"]),
+                "author": str(item.get("author") or ""),
+                "url": str(item.get("url") or ""),
+                **({"link": str(item["link"])} if item.get("link") else {}),
+                **({"snippet": str(item["snippet"])} if item.get("snippet") else {}),
+            }
             for item in outcome["results"]
         ]
         return json.dumps({"results": results, "note": outcome.get("note", "")}, ensure_ascii=False)

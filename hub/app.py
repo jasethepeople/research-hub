@@ -4,12 +4,13 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from hub.cache import CACHE_TTL, ResponseCache
 from hub.config import DEFAULT_SETTINGS, Settings
 from hub.dashboard import DASHBOARD_HTML
+from hub.downloads import DownloadManager, DownloadRequest
 from hub.fetch import TIMEOUT_SECONDS, FetchError, fetch_url
 from hub.orchestrator import search_all
 from hub.registry import Registry, assert_mcp_v1
@@ -43,6 +44,8 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
         app.state.store = store
         app.state.registry = registry
         app.state.cache = ResponseCache(ttl=CACHE_TTL, maxsize=500)
+        downloads = DownloadManager(settings.state_dir)
+        app.state.downloads = downloads
 
         async def sweep_loop():
             while True:
@@ -57,6 +60,7 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
             with suppress(asyncio.CancelledError):
                 await sweeper
             await registry.close()
+            await app.state.downloads.shutdown()
 
     app = FastAPI(title="Local Research Hub", lifespan=lifespan)
 
@@ -84,6 +88,34 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
             only={name.strip() for name in tiers.split(",") if name.strip()} if tiers else None,
         )
         return response
+
+    @app.post("/api/download")
+    async def download_enqueue(payload: DownloadRequest):
+        manager: DownloadManager = app.state.downloads
+        items = payload.items[:200]
+        if not items:
+            raise HTTPException(status_code=422, detail="items must not be empty")
+        return {"queued": manager.enqueue(items, resolve=payload.resolve)}
+
+    @app.get("/api/downloads")
+    async def downloads_list():
+        manager: DownloadManager = app.state.downloads
+        return {"downloads": manager.list(), "dir": str(manager.dir)}
+
+    @app.delete("/api/download/{job_id}")
+    async def download_remove(job_id: str):
+        manager: DownloadManager = app.state.downloads
+        if not manager.remove(job_id):
+            raise HTTPException(status_code=404, detail="no such download")
+        return {"removed": job_id}
+
+    @app.get("/api/download/{job_id}/file")
+    async def download_file(job_id: str):
+        manager: DownloadManager = app.state.downloads
+        job = manager.get(job_id)
+        if not job or job["status"] != "done" or not job.get("path"):
+            raise HTTPException(status_code=404, detail="download not ready")
+        return FileResponse(job["path"], filename=job.get("filename") or "download.bin")
 
     @app.get("/api/health")
     async def health():
