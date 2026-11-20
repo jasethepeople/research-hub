@@ -27,7 +27,8 @@ PROVIDERS = (
     "threed", "usgs_topo", "geosearch", "loc_maps", "nominatim",
     "expeditions", "flatearth", "crtsh", "wayback", "urlscan",
     "osintdir", "ia_audio", "radio", "radio_browser", "podcasts",
-    "openverse_audio",
+    "openverse_audio", "etree", "rpm78", "ccmixter",
+    "law_books", "wex", "courtlistener",
 )
 
 

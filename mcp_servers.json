@@ -1,771 +1,843 @@
 {
- "annas": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/annas_server.py"
-  ]
- },
- "libgen": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "libgen"
-  ]
- },
- "scihub": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "scihub"
-  ]
- },
- "openlibrary": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "openlibrary"
-  ]
- },
- "internetarchive": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "internetarchive"
-  ]
- },
- "rag": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx,pymupdf,pytesseract,fastembed,sqlite-vec,ebooklib,beautifulsoup4,aiosqlite",
-   "python",
-   "{{DEPLOY_DIR}}/servers/rag_server.py"
-  ]
- },
- "nvd": {
-  "category": "vulns",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "nvd"
-  ]
- },
- "exploitdb": {
-  "category": "vulns",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "exploitdb"
-  ]
- },
- "osv": {
-  "category": "vulns",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "osv"
-  ]
- },
- "github": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "github"
-  ]
- },
- "gitlab": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "gitlab"
-  ]
- },
- "npm": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "npm"
-  ]
- },
- "huggingface": {
-  "category": "ai",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "huggingface"
-  ]
- },
- "apkmirror": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "apkmirror"
-  ]
- },
- "openalex": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "openalex"
-  ]
- },
- "pubmed": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "pubmed"
-  ]
- },
- "europemc": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "europemc"
-  ]
- },
- "doaj": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "doaj"
-  ]
- },
- "standardebooks": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "standardebooks"
-  ]
- },
- "librivox": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "librivox"
-  ]
- },
- "crates": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "crates"
-  ]
- },
- "rubygems": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "rubygems"
-  ]
- },
- "maven": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "maven"
-  ]
- },
- "packagist": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "packagist"
-  ]
- },
- "dockerhub": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "dockerhub"
-  ]
- },
- "flathub": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "flathub"
-  ]
- },
- "aur": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "aur"
-  ]
- },
- "fdroid": {
-  "category": "code",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "fdroid"
-  ]
- },
- "cisa-kev": {
-  "category": "vulns",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "cisa-kev"
-  ]
- },
- "ghadvisories": {
-  "category": "vulns",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "ghadvisories"
-  ]
- },
- "metasploit": {
-  "category": "vulns",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "metasploit"
-  ]
- },
- "wikipedia": {
-  "category": "general",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "wikipedia"
-  ]
- },
- "stackexchange": {
-  "category": "general",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "stackexchange"
-  ]
- },
- "hackernews": {
-  "category": "general",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "hackernews"
-  ]
- },
- "openverse": {
-  "category": "media",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "openverse"
-  ]
- },
- "wikimedia": {
-  "category": "media",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "wikimedia"
-  ]
- },
- "artic": {
-  "category": "media",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "artic"
-  ]
- },
- "ia-video": {
-  "category": "media",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "ia-video"
-  ]
- },
- "ia-audio": {
-  "category": "audio",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "ia_audio"
-  ]
- },
- "radio": {
-  "category": "audio",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "radio"
-  ]
- },
- "radio-browser": {
-  "category": "audio",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "radio_browser"
-  ]
- },
- "podcasts": {
-  "category": "audio",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "podcasts"
-  ]
- },
- "openverse-audio": {
-  "category": "audio",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "openverse_audio"
-  ]
- },
- "gutenberg": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "gutenberg"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "wikisource": {
-  "category": "library",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "wikisource"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "crochet": {
-  "category": "craft",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "crochet"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "engraving": {
-  "category": "craft",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "engraving"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "models3d": {
-  "category": "craft",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "models3d"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "usgs-topo": {
-  "category": "maps",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "usgs_topo"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "geosearch": {
-  "category": "maps",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "geosearch"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "loc-maps": {
-  "category": "maps",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "loc_maps"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "expeditions": {
-  "category": "maps",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "expeditions"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "flatearth": {
-  "category": "maps",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "flatearth"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "crtsh": {
-  "category": "osint",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "crtsh"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "wayback": {
-  "category": "osint",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "wayback"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "urlscan": {
-  "category": "osint",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "urlscan"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "osintdir": {
-  "category": "osint",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "osintdir"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "threed": {
-  "category": "craft",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "threed"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "nominatim": {
-  "category": "maps",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "nominatim"
-  ],
-  "tools": [
-   "search"
-  ]
- },
- "osm": {
-  "category": "maps",
-  "command": "uv",
-  "args": [
-   "run",
-   "--with",
-   "mcp[cli]<2,httpx",
-   "python",
-   "{{DEPLOY_DIR}}/servers/web_server.py",
-   "nominatim"
-  ],
-  "tools": [
-   "search"
-  ]
- }
+  "annas": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/annas_server.py"
+    ]
+  },
+  "libgen": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "libgen"
+    ]
+  },
+  "scihub": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "scihub"
+    ]
+  },
+  "openlibrary": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "openlibrary"
+    ]
+  },
+  "internetarchive": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "internetarchive"
+    ]
+  },
+  "rag": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx,pymupdf,pytesseract,fastembed,sqlite-vec,ebooklib,beautifulsoup4,aiosqlite",
+      "python",
+      "{{DEPLOY_DIR}}/servers/rag_server.py"
+    ]
+  },
+  "nvd": {
+    "category": "vulns",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "nvd"
+    ]
+  },
+  "exploitdb": {
+    "category": "vulns",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "exploitdb"
+    ]
+  },
+  "osv": {
+    "category": "vulns",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "osv"
+    ]
+  },
+  "github": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "github"
+    ]
+  },
+  "gitlab": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "gitlab"
+    ]
+  },
+  "npm": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "npm"
+    ]
+  },
+  "huggingface": {
+    "category": "ai",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "huggingface"
+    ]
+  },
+  "apkmirror": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "apkmirror"
+    ]
+  },
+  "openalex": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "openalex"
+    ]
+  },
+  "pubmed": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "pubmed"
+    ]
+  },
+  "europemc": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "europemc"
+    ]
+  },
+  "doaj": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "doaj"
+    ]
+  },
+  "standardebooks": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "standardebooks"
+    ]
+  },
+  "librivox": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "librivox"
+    ]
+  },
+  "crates": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "crates"
+    ]
+  },
+  "rubygems": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "rubygems"
+    ]
+  },
+  "maven": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "maven"
+    ]
+  },
+  "packagist": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "packagist"
+    ]
+  },
+  "dockerhub": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "dockerhub"
+    ]
+  },
+  "flathub": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "flathub"
+    ]
+  },
+  "aur": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "aur"
+    ]
+  },
+  "fdroid": {
+    "category": "code",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "fdroid"
+    ]
+  },
+  "cisa-kev": {
+    "category": "vulns",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "cisa-kev"
+    ]
+  },
+  "ghadvisories": {
+    "category": "vulns",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "ghadvisories"
+    ]
+  },
+  "metasploit": {
+    "category": "vulns",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "metasploit"
+    ]
+  },
+  "wikipedia": {
+    "category": "general",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "wikipedia"
+    ]
+  },
+  "stackexchange": {
+    "category": "general",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "stackexchange"
+    ]
+  },
+  "hackernews": {
+    "category": "general",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "hackernews"
+    ]
+  },
+  "openverse": {
+    "category": "media",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "openverse"
+    ]
+  },
+  "wikimedia": {
+    "category": "media",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "wikimedia"
+    ]
+  },
+  "artic": {
+    "category": "media",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "artic"
+    ]
+  },
+  "ia-video": {
+    "category": "media",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "ia-video"
+    ]
+  },
+  "ia-audio": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "ia_audio"
+    ]
+  },
+  "radio": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "radio"
+    ]
+  },
+  "radio-browser": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "radio_browser"
+    ]
+  },
+  "podcasts": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "podcasts"
+    ]
+  },
+  "openverse-audio": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "openverse_audio"
+    ]
+  },
+  "gutenberg": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "gutenberg"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "wikisource": {
+    "category": "library",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "wikisource"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "crochet": {
+    "category": "craft",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "crochet"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "engraving": {
+    "category": "craft",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "engraving"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "models3d": {
+    "category": "craft",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "models3d"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "usgs-topo": {
+    "category": "maps",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "usgs_topo"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "geosearch": {
+    "category": "maps",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "geosearch"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "loc-maps": {
+    "category": "maps",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "loc_maps"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "expeditions": {
+    "category": "maps",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "expeditions"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "flatearth": {
+    "category": "maps",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "flatearth"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "crtsh": {
+    "category": "osint",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "crtsh"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "wayback": {
+    "category": "osint",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "wayback"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "urlscan": {
+    "category": "osint",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "urlscan"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "osintdir": {
+    "category": "osint",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "osintdir"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "threed": {
+    "category": "craft",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "threed"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "nominatim": {
+    "category": "maps",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "nominatim"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "osm": {
+    "category": "maps",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "nominatim"
+    ],
+    "tools": [
+      "search"
+    ]
+  },
+  "etree": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "etree"
+    ]
+  },
+  "rpm78": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "rpm78"
+    ]
+  },
+  "ccmixter": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "ccmixter"
+    ]
+  },
+  "law-books": {
+    "category": "law",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "law_books"
+    ]
+  },
+  "wex": {
+    "category": "law",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "wex"
+    ]
+  },
+  "courtlistener": {
+    "category": "law",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "courtlistener"
+    ]
+  }
 }

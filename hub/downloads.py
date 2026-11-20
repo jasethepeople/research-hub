@@ -126,6 +126,8 @@ async def _resolve_uncached(client: httpx.AsyncClient, url: str, tier: str) -> t
             return "", "", "no downloadable file in archive.org item"
         if tier == "podcasts" and ".rss" in url:
             return await _podcast_episode(client, url)
+        if tier == "ccmixter":
+            return url, "", "ccmixter audio (browser UA)"
         if tier == "standardebooks":
             response = await client.get(url, headers=_ua_headers(), timeout=40.0, follow_redirects=True)
             response.raise_for_status()

@@ -47,8 +47,8 @@ video.thumb{width:280px;height:160px}
 <aside id="dlpanel" class="hidden"><h3>Downloads</h3><div id="dljobs"><div class="empty">No downloads yet.</div></div></aside>
 <main id="panes" class="panes"></main>
 <script>
-const CATEGORY_TITLES = {library: "Library", code: "Code", vulns: "Vulnerabilities", general: "General", media: "Pictures & Video", audio: "Music & Audio"};
-const CATEGORY_ORDER = ["library", "code", "vulns", "media", "audio", "general"];
+const CATEGORY_TITLES = {library: "Library", law: "Law Library", code: "Code", vulns: "Vulnerabilities", general: "General", media: "Pictures & Video", audio: "Music & Audio"};
+const CATEGORY_ORDER = ["library", "law", "code", "vulns", "media", "audio", "general"];
 let tierInfo = [];           // [{name, category, state}]
 let checked = new Set();     // tier names included in searches
 let activeTab = "library";
@@ -58,10 +58,10 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>\"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char]));
 }
 function loadChecked() {
-  try { const saved = JSON.parse(localStorage.getItem("hub-tiers") || "null"); if (Array.isArray(saved)) return new Set(saved); } catch (e) {}
+  try { const saved = JSON.parse(localStorage.getItem("hub-tiers-disabled") || localStorage.getItem("hub-tiers") || "null"); if (Array.isArray(saved)) return new Set(saved); } catch (e) {}
   return null;
 }
-function saveChecked() { localStorage.setItem("hub-tiers", JSON.stringify([...checked])); }
+function saveChecked() { localStorage.setItem("hub-tiers-disabled", JSON.stringify(allNames().filter(n => !checked.has(n)))); }
 function allNames() { return tierInfo.map(t => t.name); }
 function categories() {
   const present = [...new Set(tierInfo.map(t => t.category || "other"))];
@@ -172,7 +172,7 @@ document.querySelector("#nonebtn").addEventListener("click", () => { checked = n
       .map(([name, info]) => ({name, category: info.category || "other", state: info.state}));
   } catch (e) { tierInfo = []; }
   const saved = loadChecked();
-  checked = saved ? new Set([...saved].filter(n => allNames().includes(n))) : new Set(allNames());
+  checked = saved ? new Set(allNames().filter(n => !saved.has(n))) : new Set(allNames());
   if (!tierInfo.length) tierInfo = [{name: "annas", category: "library", state: "absent"}];
   renderPanes();
   renderTabsAndChecks();

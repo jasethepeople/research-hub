@@ -31,7 +31,7 @@ def search(query: str, limit: int = 20) -> dict:
     results = []
     for station in response.json():
         codec = (station.get("codec") or "").strip()
-        bitrate = (station.get("bitrate") or "").strip()
+        bitrate = str(station.get("bitrate") or "").strip()
         quality = " ".join(part for part in (codec, f"{bitrate}kbps" if bitrate else "") if part)
         tags = ", ".join((station.get("tags") or "").split(",")[:4])
         stream = station.get("url_resolved") or station.get("url") or ""
