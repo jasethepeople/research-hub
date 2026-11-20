@@ -61,6 +61,16 @@ async def resolve_url(client: httpx.AsyncClient, url: str, tier: str) -> tuple[s
     return result
 
 
+async def _podcast_episode(client: httpx.AsyncClient, feed_url: str) -> tuple[str, str, str]:
+    """Podcast RSS feed → latest episode's direct audio URL."""
+    response = await client.get(feed_url, headers=_ua_headers(), timeout=40.0, follow_redirects=True)
+    response.raise_for_status()
+    m = re.search(r'<enclosure[^>]*url="([^"]+)"', response.text)
+    if m:
+        return m.group(1), "", "podcast episode"
+    return "", "", "no enclosure in podcast feed"
+
+
 async def _resolve_uncached(client: httpx.AsyncClient, url: str, tier: str) -> tuple[str, str, str]:
     try:
         if tier == "arxiv" and "/abs/" in url:
@@ -114,6 +124,8 @@ async def _resolve_uncached(client: httpx.AsyncClient, url: str, tier: str) -> t
                 name = ranked[0].get("name", "")
                 return f"https://archive.org/download/{ident}/{name}", sanitize_name(name), "archive.org file"
             return "", "", "no downloadable file in archive.org item"
+        if tier == "podcasts" and ".rss" in url:
+            return await _podcast_episode(client, url)
         if tier == "standardebooks":
             response = await client.get(url, headers=_ua_headers(), timeout=40.0, follow_redirects=True)
             response.raise_for_status()
