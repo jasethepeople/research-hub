@@ -109,7 +109,7 @@ async def _resolve_uncached(client: httpx.AsyncClient, url: str, tier: str) -> t
                         return dl, "", "anna's fast download"
                     return "", "", f"anna's: {data.get('error') or 'no fast download'}"
             return "", "", "anna's download needs ANNAS_KEY (membership)"
-        if tier == "internetarchive" and "/details/" in url:
+        if "/details/" in url and "archive.org" in url:
             ident = url.rstrip("/").rsplit("/", 1)[-1]
             response = await client.get(f"https://archive.org/metadata/{ident}", timeout=40.0)
             response.raise_for_status()

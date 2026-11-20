@@ -95,7 +95,7 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
         items = payload.items[:200]
         if not items:
             raise HTTPException(status_code=422, detail="items must not be empty")
-        return {"queued": manager.enqueue(items, resolve=payload.resolve)}
+        return {"queued": manager.enqueue([item.model_dump() for item in items], resolve=payload.resolve)}
 
     @app.get("/api/downloads")
     async def downloads_list():

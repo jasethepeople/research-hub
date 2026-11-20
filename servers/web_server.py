@@ -15,14 +15,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lib.tierbase import PinBoard, fetch_page
 
 PROVIDERS = (
-    "openlibrary", "internetarchive", "arxiv", "crossref", "libgen", "scihub",
-    "nvd", "exploitdb", "osv", "github", "gitlab", "npm", "huggingface",
-    "apkmirror", "openalex", "pubmed", "europemc", "doaj",
-    "standardebooks", "librivox", "crates", "rubygems", "maven", "packagist",
-    "dockerhub", "flathub", "aur", "fdroid", "cisa-kev", "ghadvisories",
-    "metasploit", "wikipedia", "stackexchange", "hackernews",
-    "wikimedia", "artic", "openverse", "ia-video", "metmuseum", "smithsonian",
-    "ia_audio", "radio", "radio_browser", "podcasts", "openverse_audio",
+    "openlibrary", "internetarchive", "arxiv", "crossref", "libgen",
+    "scihub", "nvd", "exploitdb", "osv", "github",
+    "gitlab", "npm", "huggingface", "apkmirror", "openalex",
+    "pubmed", "europemc", "doaj", "standardebooks", "librivox",
+    "crates", "rubygems", "maven", "packagist", "dockerhub",
+    "flathub", "aur", "fdroid", "cisa-kev", "ghadvisories",
+    "metasploit", "wikipedia", "stackexchange", "hackernews", "wikimedia",
+    "artic", "openverse", "ia-video", "metmuseum", "smithsonian",
+    "gutenberg", "wikisource", "crochet", "engraving", "models3d",
+    "threed", "usgs_topo", "geosearch", "loc_maps", "nominatim",
+    "expeditions", "flatearth", "crtsh", "wayback", "urlscan",
+    "osintdir", "ia_audio", "radio", "radio_browser", "podcasts",
+    "openverse_audio",
 )
 
 
