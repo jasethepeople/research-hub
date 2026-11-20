@@ -47,8 +47,8 @@ video.thumb{width:280px;height:160px}
 <aside id="dlpanel" class="hidden"><h3>Downloads</h3><div id="dljobs"><div class="empty">No downloads yet.</div></div></aside>
 <main id="panes" class="panes"></main>
 <script>
-const CATEGORY_TITLES = {library: "Library", code: "Code", vulns: "Vulnerabilities", general: "General", media: "Pictures & Video"};
-const CATEGORY_ORDER = ["library", "code", "vulns", "media", "general"];
+const CATEGORY_TITLES = {library: "Library", code: "Code", vulns: "Vulnerabilities", general: "General", media: "Pictures & Video", audio: "Music & Audio"};
+const CATEGORY_ORDER = ["library", "code", "vulns", "media", "audio", "general"];
 let tierInfo = [];           // [{name, category, state}]
 let checked = new Set();     // tier names included in searches
 let activeTab = "library";
@@ -119,9 +119,15 @@ function showResults(results, notes) {
       const link = url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>` : title;
       const direct = /^https?:\/\//i.test(item.link || "") ? item.link : "";
       const isVideo = /\.(mp4|webm|ogg)(\?|$)/i.test(direct) || /archive\.org\/download\/.+\.mp4/.test(direct);
-      const thumb = isVideo
-        ? `<video class="thumb" src="${esc(direct)}" controls preload="metadata"></video>`
-        : (direct ? `<a href="${url || esc(direct)}" target="_blank" rel="noopener noreferrer"><img class="thumb" src="${esc(direct)}" loading="lazy" alt=""></a>` : "");
+      const isAudio = /\.(mp3|m4a|aac|oga|opus|wav|flac)(\?|$)/i.test(direct) || /streamtheworld|cdnstream|radionetz|\/stream\//i.test(direct) || item.tier === "radio" || item.tier === "radio-browser" || item.tier === "podcasts" || item.tier === "openverse-audio" || item.tier === "ia-audio";
+      let thumb = "";
+      if (isVideo) {
+        thumb = `<video class="thumb" src="${esc(direct)}" controls preload="metadata"></video>`;
+      } else if (isAudio) {
+        thumb = `<audio class="thumb" controls preload="none" src="${esc(direct)}"></audio>`;
+      } else if (direct) {
+        thumb = `<a href="${url || esc(direct)}" target="_blank" rel="noopener noreferrer"><img class="thumb" src="${esc(direct)}" loading="lazy" alt=""></a>`;
+      }
       const dlUrl = direct || url;
       const dlbtn = dlUrl ? `<button type="button" class="dl" data-i="${item._i}" title="Download">&#10515;</button>` : "";
       return `<article class="result">${thumb}<span class="dlrow">${link}${dlbtn}</span><div class="byline">${esc(item.tier)}${author}</div>${also}${snippet}</article>`;

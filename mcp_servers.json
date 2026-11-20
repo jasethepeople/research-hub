@@ -452,5 +452,65 @@
       "{{DEPLOY_DIR}}/servers/web_server.py",
       "ia-video"
     ]
+  },
+  "ia-audio": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "ia_audio"
+    ]
+  },
+  "radio": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "radio"
+    ]
+  },
+  "radio-browser": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "radio_browser"
+    ]
+  },
+  "podcasts": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "podcasts"
+    ]
+  },
+  "openverse-audio": {
+    "category": "audio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "openverse_audio"
+    ]
   }
 }

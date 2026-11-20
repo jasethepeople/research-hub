@@ -22,6 +22,7 @@ PROVIDERS = (
     "dockerhub", "flathub", "aur", "fdroid", "cisa-kev", "ghadvisories",
     "metasploit", "wikipedia", "stackexchange", "hackernews",
     "wikimedia", "artic", "openverse", "ia-video", "metmuseum", "smithsonian",
+    "ia_audio", "radio", "radio_browser", "podcasts", "openverse_audio",
 )
 
 
