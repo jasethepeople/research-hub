@@ -1,26 +1,25 @@
-"""LibGen tier: shadow library search scraped from libgen.li (no key required)."""
+from __future__ import annotations
 
 import re
 from html.parser import HTMLParser
+from typing import Any
 
-import httpx
+from lib.providers._shadow import API_UA, ParseDrift, cache, clean, format_results, get_html
 
-MIRROR = "https://libgen.li"
-SEARCH_URL = f"{MIRROR}/index.php"
-UA = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+API = "https://libgen.li/index.php"
+MIRRORS = ("https://libgen.li",)
 MD5_RE = re.compile(r"md5=([0-9a-fA-F]{32})")
+CHALLENGE_RE = re.compile(r"cf-chl|cloudflare|captcha|access denied|verify you are human", re.I)
 
 
 class _RowsParser(HTMLParser):
-    """Collect result-table rows (those containing an md5 link) as cells."""
-
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
-        self.rows: list[list[dict]] = []
-        self._row: list[dict] | None = None
-        self._cell: dict | None = None
+        self.rows: list[list[dict[str, Any]]] = []
+        self._row: list[dict[str, Any]] | None = None
+        self._cell: dict[str, Any] | None = None
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag == "tr":
             self._row = []
         elif tag in {"td", "th"} and self._row is not None:
@@ -30,73 +29,81 @@ class _RowsParser(HTMLParser):
             if href:
                 self._cell["hrefs"].append(href)
 
-    def handle_endtag(self, tag):
+    def handle_endtag(self, tag: str) -> None:
         if tag in {"td", "th"} and self._cell is not None and self._row is not None:
-            self._cell["text"] = " ".join("".join(self._cell["parts"]).split())
+            self._cell["text"] = clean("".join(self._cell["parts"]))
             self._row.append(self._cell)
             self._cell = None
         elif tag == "tr" and self._row is not None:
-            if any("md5=" in href for entry in self._row for href in entry["hrefs"]):
+            if any("md5=" in href for cell in self._row for href in cell["hrefs"]):
                 self.rows.append(self._row)
             self._row = None
 
-    def handle_data(self, data):
+    def handle_data(self, data: str) -> None:
         if self._cell is not None:
             self._cell["parts"].append(data)
-    def parse(self, html_text: str) -> list[list[dict]]:
-        try:
-            self.feed(html_text)
-            self.close()
-        except Exception:
-            return self.rows
-        return self.rows
 
 
-def search(query: str, limit: int = 20) -> dict:
-    response = httpx.get(
-        SEARCH_URL,
-        params={"req": query.strip(), "res": min(max(limit, 1), 50)},
-        timeout=30.0,
-        headers={"User-Agent": UA},
-        follow_redirects=True,
-    )
-    response.raise_for_status()
-    if "Library Genesis" not in response.text:
-        return {"results": [], "note": "mirror returned an unexpected page"}
-    results: list[dict] = []
-    seen: set[str] = set()
-    for row in _RowsParser().parse(response.text):
+def parse_response(payload: str | dict[str, Any], limit: int = 20) -> dict[str, Any]:
+    if isinstance(payload, dict) and payload.get("kind") == "transport-observation":
+        note = str(payload.get("note") or "mirror-dead")
+        if note in {"challenge", "cloudflare-403", "mirror-dead", "needs-key", "parse-drift"}:
+            return {"results": [], "note": note}
+        raise ParseDrift("invalid LibGen transport observation")
+    if not isinstance(payload, str):
+        raise ParseDrift("LibGen response was not HTML text")
+    if CHALLENGE_RE.search(payload):
+        return {"results": [], "note": "challenge"}
+    if "Library Genesis" not in payload or "<table" not in payload.lower():
+        raise ParseDrift("LibGen search markup changed")
+    parser = _RowsParser()
+    try:
+        parser.feed(payload)
+        parser.close()
+    except Exception as error:
+        raise ParseDrift("LibGen search markup could not be parsed") from error
+    results = []
+    seen = set()
+    for row in parser.rows:
         if len(row) < 9:
             continue
         md5 = next(
             (
                 match.group(1).lower()
-                for entry in row
-                for href in entry["hrefs"]
+                for cell in row
+                for href in cell["hrefs"]
                 if (match := MD5_RE.search(href))
             ),
             "",
         )
-        if not md5 or md5 in seen:
+        title = clean(row[0]["text"])
+        if not md5 or md5 in seen or not title:
             continue
         seen.add(md5)
         results.append(
             {
                 "md5": md5,
-                "title": row[0]["text"],
-                "author": row[1]["text"],
-                "url": f"{MIRROR}/ads.php?md5={md5}",
-                "publisher": row[2]["text"],
-                "year": row[3]["text"],
-                "language": row[4]["text"],
-                "size": row[6]["text"],
-                "format": row[7]["text"].upper(),
-                "annas": next(
-                    (href for entry in row for href in entry["hrefs"] if "annas-archive" in href),
-                    "",
-                ),
+                "title": title,
+                "author": clean(row[1]["text"]),
+                "url": f"https://libgen.li/ads.php?md5={md5}",
+                "publisher": clean(row[2]["text"]),
+                "year": clean(row[3]["text"]),
+                "language": clean(row[4]["text"]),
+                "format": clean(row[7]["text"]).upper(),
             }
         )
-        if len(results) >= limit:
-            break
-    return {"results": results, "note": "" if results else "no parsable results"}
+    return format_results(results, limit)
+
+
+@cache
+def search(query: str, limit: int = 20) -> dict[str, Any]:
+    page = get_html(
+        API,
+        params={"req": query, "res": limit, "view": "simple", "column": "def"},
+        headers={"User-Agent": API_UA},
+        mirrors=MIRRORS,
+    )
+    return parse_response(page, limit)
+
+
+__all__ = ["parse_response", "search"]
