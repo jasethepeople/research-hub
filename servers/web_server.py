@@ -83,9 +83,10 @@ PROVIDERS = (
     "wex",
     "courtlistener",
     "datacite",
+    "x-libgen",
 )
 
-PROVIDER_ALIASES = {'rpm78': '78rpm', 'threed': 'models3d'}
+PROVIDER_ALIASES = {'rpm78': '78rpm', 'threed': 'models3d', 'x-libgen': 'libgen'}
 
 
 def main() -> None:

@@ -3,13 +3,23 @@ from __future__ import annotations
 import re
 from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlsplit
 
 from lib.providers._shadow import API_UA, ParseDrift, cache, clean, format_results, get_html
 
 API = "https://libgen.li/index.php"
-MIRRORS = ("https://libgen.li",)
+MIRRORS = (
+    "https://libgen.rs",
+    "https://libgen.is",
+    "https://libgen.st",
+    "https://libgen.gs",
+    "https://libgen.la",
+)
 MD5_RE = re.compile(r"md5=([0-9a-fA-F]{32})")
-CHALLENGE_RE = re.compile(r"cf-chl|cloudflare|captcha|access denied|verify you are human", re.I)
+CHALLENGE_RE = re.compile(
+    r"cf-chl|captcha|access denied|verify you are human|<title>\s*just a moment",
+    re.I,
+)
 
 
 class _RowsParser(HTMLParser):
@@ -56,6 +66,9 @@ def parse_response(payload: str | dict[str, Any], limit: int = 20) -> dict[str, 
         return {"results": [], "note": "challenge"}
     if "Library Genesis" not in payload or "<table" not in payload.lower():
         raise ParseDrift("LibGen search markup changed")
+    response_url = str(getattr(payload, "url", "") or API)
+    parts = urlsplit(response_url)
+    base_url = f"{parts.scheme}://{parts.netloc}" if parts.scheme and parts.netloc else "https://libgen.li"
     parser = _RowsParser()
     try:
         parser.feed(payload)
@@ -85,7 +98,7 @@ def parse_response(payload: str | dict[str, Any], limit: int = 20) -> dict[str, 
                 "md5": md5,
                 "title": title,
                 "author": clean(row[1]["text"]),
-                "url": f"https://libgen.li/ads.php?md5={md5}",
+                "url": f"{base_url}/ads.php?md5={md5}",
                 "publisher": clean(row[2]["text"]),
                 "year": clean(row[3]["text"]),
                 "language": clean(row[4]["text"]),

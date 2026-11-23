@@ -8,6 +8,7 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from functools import wraps
 from typing import Any, TypeVar
 from urllib.parse import urljoin, urlsplit
@@ -20,10 +21,16 @@ MAX_IN_FLIGHT = 3
 CACHE_TTL_SECONDS = 900.0
 CACHE_MAX_ENTRIES = 200
 MIRROR_COOLDOWN_SECONDS = 300.0
+MAX_HTML_BYTES = 2 * 1024 * 1024
+MAX_JSON_BYTES = 4 * 1024 * 1024
 API_UA = "ResearchHubTiers/0.1 (+https://github.com/jasethepeople/research-hub-tiers)"
 BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-DEFAULT_HEADERS = {"Accept": "application/json, text/html, application/xml;q=0.9, */*;q=0.8", "User-Agent": API_UA}
-FAILURE_NOTES = {"challenge", "cloudflare-403", "mirror-dead", "needs-key", "parse-drift"}
+DEFAULT_HEADERS = {
+    "Accept": "application/json, text/html, application/xml;q=0.9, */*;q=0.8",
+    "Accept-Language": "en",
+    "User-Agent": API_UA,
+}
+FAILURE_NOTES = {"challenge", "cloudflare-403", "mirror-dead", "needs-key", "parse-drift", "timeout", "oom", "truncated"}
 
 T = TypeVar("T")
 _semaphore = threading.BoundedSemaphore(MAX_IN_FLIGHT)
@@ -67,6 +74,35 @@ class HttpFailure(ProviderFailure):
     def __init__(self, status_code: int):
         self.status_code = status_code
         super().__init__(f"HTTP {status_code}")
+
+
+class PayloadTooLarge(ProviderFailure):
+    note = "truncated"
+
+
+class HttpText(str):
+    def __new__(cls, value: str, note: str = "", status_code: int | None = None, url: str = ""):
+        instance = super().__new__(cls, value)
+        instance.note = note
+        instance.status_code = status_code
+        instance.url = url
+        return instance
+
+
+@dataclass(frozen=True)
+class _LimitedResponse:
+    status_code: int
+    headers: httpx.Headers
+    content: bytes
+    note: str = ""
+    url: str = ""
+
+    @property
+    def text(self) -> str:
+        return httpx.Response(self.status_code, headers=self.headers, content=self.content).text
+
+    def json(self) -> Any:
+        return json.loads(self.content)
 
 
 def clean(text: Any) -> str:
@@ -140,14 +176,31 @@ def last_http_status() -> int | None:
     return getattr(_request_state, "status", None)
 
 
+def last_http_note() -> str:
+    return getattr(_request_state, "note", "")
+
+
+def last_http_body() -> bytes:
+    return getattr(_request_state, "body", b"")
+
+
+def last_http_content_type() -> str:
+    return getattr(_request_state, "content_type", "")
+
+
 def clear_last_http_status() -> None:
-    if hasattr(_request_state, "status"):
-        del _request_state.status
+    for name in ("status", "note", "body", "content_type"):
+        if hasattr(_request_state, name):
+            delattr(_request_state, name)
 
 
 def note_for_error(error: BaseException) -> str:
     if isinstance(error, ProviderFailure):
+        if isinstance(error.__cause__, httpx.TimeoutException):
+            return "timeout"
         return error.note
+    if isinstance(error, httpx.TimeoutException):
+        return "timeout"
     if isinstance(error, httpx.RequestError):
         return "mirror-dead"
     return "parse-drift"
@@ -197,7 +250,13 @@ def _raise_for_status(response: httpx.Response) -> None:
     if status == 401:
         raise NeedsKey("authentication required")
     if status == 403:
-        if "cf-ray" in response.headers or "cloudflare" in body or "attention required" in body:
+        if (
+            response.headers.get("cf-mitigated", "").casefold() == "challenge"
+            or "cf-ray" in response.headers
+            or "cloudflare" in body
+            or "just a moment" in body
+            or "attention required" in body
+        ):
             raise Cloudflare403("Cloudflare denied the request")
         raise Challenge("access challenge")
     if status == 429:
@@ -205,6 +264,31 @@ def _raise_for_status(response: httpx.Response) -> None:
     if status in (404, 410) or status >= 500:
         raise MirrorDead(f"HTTP {status}")
     raise HttpFailure(status)
+
+
+def _challenge_note(status: int, headers: Mapping[str, str], body: bytes) -> str:
+    sample = body.decode("utf-8", "ignore").casefold()
+    if headers.get("cf-mitigated", "").casefold() == "challenge":
+        return "challenge"
+    if status == 403 and (
+        "cf-ray" in headers
+        or "cloudflare" in sample
+        or "just a moment" in sample
+        or "attention required" in sample
+    ):
+        return "challenge"
+    if any(
+        marker in sample
+        for marker in (
+            "<title>just a moment",
+            "cf-chl-",
+            "cdn-cgi/challenge-platform/",
+            "__cf_chl_",
+            "cf-challenge-running",
+        )
+    ):
+        return "challenge"
+    return ""
 
 
 def _request(
@@ -215,39 +299,95 @@ def _request(
     mirrors: Sequence[str] | None = None,
     method: str = "GET",
     allow_status_errors: bool = False,
-) -> httpx.Response:
+    max_bytes: int = MAX_JSON_BYTES,
+    max_retries: int = RETRIES,
+) -> _LimitedResponse:
+    max_bytes = max(1, min(int(max_bytes), MAX_JSON_BYTES))
+    retry_limit = max(0, min(int(max_retries), RETRIES))
     bases = tuple(dict.fromkeys(str(base).rstrip("/") for base in (mirrors or ()) if base))
     candidates = _mirror_candidates(url, bases)
     if not candidates:
         raise MirrorDead("all mirrors are cooling down")
     last_error: BaseException | None = None
+    retries_used = 0
     merged_headers = {**DEFAULT_HEADERS, **dict(headers or {})}
     for candidate in candidates:
-        for attempt in range(RETRIES + 1):
+        while True:
+            _request_state.status = None
+            _request_state.note = ""
+            _request_state.body = b""
+            _request_state.content_type = ""
             try:
                 with _semaphore:
-                    response = httpx.request(
-                        method,
-                        candidate,
-                        params=params,
-                        headers=merged_headers,
-                        timeout=TIMEOUT_SECONDS,
-                        follow_redirects=True,
-                    )
-                _request_state.status = response.status_code
-                if response.status_code == 429 or 500 <= response.status_code <= 599:
-                    if attempt < RETRIES:
-                        time.sleep(0.2 * (2**attempt))
-                        continue
+                    with httpx.Client(timeout=TIMEOUT_SECONDS, follow_redirects=True) as client:
+                        with client.stream(
+                            method,
+                            candidate,
+                            params=params,
+                            headers=merged_headers,
+                        ) as response:
+                            _request_state.status = response.status_code
+                            response_headers = httpx.Headers(response.headers)
+                            content_type = response_headers.get("content-type", "").casefold()
+                            response_limit = max_bytes
+                            if response_limit > MAX_HTML_BYTES and (
+                                "text/html" in content_type or "application/xhtml+xml" in content_type
+                            ):
+                                response_limit = MAX_HTML_BYTES
+                            body = bytearray()
+                            truncated = False
+                            if method.upper() != "HEAD":
+                                for chunk in response.iter_bytes():
+                                    if response_limit > MAX_HTML_BYTES and not (
+                                        "application/json" in content_type or "+json" in content_type
+                                    ):
+                                        sample = (bytes(body[:512]) + chunk[:512]).lstrip().lower()
+                                        if sample.startswith((b"<!doctype html", b"<html", b"<head", b"<body", b"<title", b"<meta")):
+                                            response_limit = MAX_HTML_BYTES
+                                    available = response_limit - len(body)
+                                    if available <= 0:
+                                        truncated = True
+                                        break
+                                    if len(chunk) > available:
+                                        body.extend(chunk[:available])
+                                        truncated = True
+                                        break
+                                    body.extend(chunk)
+                            content = bytes(body)
+                            note = _challenge_note(response.status_code, response_headers, content)
+                            _request_state.body = content
+                            _request_state.content_type = content_type
+                            _request_state.note = note
+                            if truncated and not note:
+                                note = "truncated"
+                            limited = _LimitedResponse(
+                                response.status_code,
+                                response_headers,
+                                content,
+                                note,
+                                str(response.url),
+                            )
+                _request_state.status = limited.status_code
+                if (limited.status_code == 429 or 500 <= limited.status_code <= 599) and retries_used < retry_limit:
+                    retries_used += 1
+                    time.sleep(0.2 * (2 ** (retries_used - 1)))
+                    continue
                 if allow_status_errors:
-                    if 200 <= response.status_code < 400:
+                    if 200 <= limited.status_code < 400:
                         _mark_good(bases, candidate)
-                    elif response.status_code >= 500:
+                    elif limited.status_code >= 500:
                         _mark_dead(candidate)
-                    return response
+                    if limited.note:
+                        _request_state.note = limited.note
+                    if limited.status_code >= 400 and not limited.note:
+                        try:
+                            _raise_for_status(limited)
+                        except ProviderFailure as error:
+                            _request_state.note = error.note
+                    return limited
                 try:
-                    _raise_for_status(response)
-                except (Cloudflare403, MirrorDead) as error:
+                    _raise_for_status(limited)
+                except MirrorDead as error:
                     _mark_dead(candidate)
                     last_error = error
                     break
@@ -255,7 +395,9 @@ def _request(
                     last_error = error
                     break
                 _mark_good(bases, candidate)
-                return response
+                if limited.note:
+                    _request_state.note = limited.note
+                return limited
             except (NeedsKey, HttpFailure):
                 raise
             except MirrorDead as error:
@@ -264,8 +406,9 @@ def _request(
                 break
             except httpx.RequestError as error:
                 last_error = error
-                if attempt < RETRIES:
-                    time.sleep(0.2 * (2**attempt))
+                if retries_used < retry_limit:
+                    retries_used += 1
+                    time.sleep(0.2 * (2 ** (retries_used - 1)))
                     continue
                 _mark_dead(candidate)
                 break
@@ -283,12 +426,24 @@ def get_html(
     headers: Mapping[str, str] | None = None,
     mirrors: Sequence[str] | None = None,
 ) -> str:
-    request_headers = {"User-Agent": BROWSER_UA, **dict(headers or {})}
-    response = _request(url, params=params, headers=request_headers, mirrors=mirrors)
+    request_headers = {**dict(headers or {}), "User-Agent": BROWSER_UA, "Accept-Language": "en"}
+    response = _request(
+        url,
+        params=params,
+        headers=request_headers,
+        mirrors=mirrors,
+        max_bytes=MAX_HTML_BYTES,
+    )
     body = response.text
     if not body.strip():
         raise ParseDrift("empty response body")
-    return body
+    lowered = body[:4096].casefold()
+    note = response.note
+    if "<title>just a moment" in lowered or "cf-mitigated: challenge" in lowered:
+        note = "challenge"
+    if note:
+        _request_state.note = note
+    return HttpText(body, note, response.status_code, response.url)
 
 
 def get_json(
@@ -298,9 +453,27 @@ def get_json(
     headers: Mapping[str, str] | None = None,
     mirrors: Sequence[str] | None = None,
 ) -> Any:
-    response = _request(url, params=params, headers=headers, mirrors=mirrors)
+    response = _request(
+        url,
+        params=params,
+        headers=headers,
+        mirrors=mirrors,
+        max_bytes=MAX_JSON_BYTES,
+    )
+    if response.note:
+        _request_state.note = response.note
+    if response.note == "challenge":
+        raise Challenge("Cloudflare challenge page")
+    if response.note == "truncated":
+        raise PayloadTooLarge("JSON response exceeded the 4 MiB limit")
     if not response.content.strip():
         raise ParseDrift("empty response body")
+    content_type = response.headers.get("content-type", "").casefold()
+    body_prefix = response.text[:4096].casefold()
+    if response.headers.get("cf-mitigated", "").casefold() == "challenge":
+        raise Challenge("Cloudflare challenge page")
+    if "text/html" in content_type and "<title>just a moment" in body_prefix:
+        raise Challenge("Cloudflare challenge page")
     try:
         return response.json()
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
@@ -313,6 +486,8 @@ def get_raw_response(
     params: Mapping[str, Any] | None = None,
     headers: Mapping[str, str] | None = None,
     mirrors: Sequence[str] | None = None,
+    max_bytes: int = MAX_JSON_BYTES,
+    max_retries: int = RETRIES,
 ) -> tuple[int, bytes]:
     response = _request(
         url,
@@ -320,6 +495,8 @@ def get_raw_response(
         headers=headers,
         mirrors=mirrors,
         allow_status_errors=True,
+        max_bytes=max_bytes,
+        max_retries=max_retries,
     )
     return response.status_code, response.content
 
@@ -337,6 +514,7 @@ def cache(function: Callable[[str, int], dict[str, Any]]) -> Callable[[str, int]
         if not normalized:
             return {"results": [], "note": "no-results"}
         key = (function.__module__, normalized.casefold(), bounded_limit)
+        _request_state.note = ""
         now = time.monotonic()
         with _cache_lock:
             cached = _cache.get(key)
@@ -349,7 +527,8 @@ def cache(function: Callable[[str, int], dict[str, Any]]) -> Callable[[str, int]
             if not isinstance(result, dict) or not isinstance(result.get("results"), list):
                 raise ParseDrift("provider returned an invalid result shape")
             items = [item for item in result["results"] if isinstance(item, dict)]
-            response = format_results(items, bounded_limit, clean(result.get("note")))
+            note = clean(result.get("note")) or clean(getattr(_request_state, "note", ""))
+            response = format_results(items, bounded_limit, note)
         except Exception as error:
             return {"results": [], "note": note_for_error(error)}
         if response["note"] not in FAILURE_NOTES:
@@ -392,6 +571,9 @@ __all__ = [
     "Challenge",
     "HttpFailure",
     "MAX_IN_FLIGHT",
+    "MAX_HTML_BYTES",
+    "MAX_JSON_BYTES",
+    "PayloadTooLarge",
     "MirrorDead",
     "NeedsKey",
     "ParseDrift",
@@ -406,6 +588,9 @@ __all__ = [
     "get_json",
     "get_raw_response",
     "last_http_status",
+    "last_http_note",
+    "last_http_body",
+    "last_http_content_type",
     "note_for_error",
     "normalize_query",
     "probe",
