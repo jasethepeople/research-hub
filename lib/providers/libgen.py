@@ -9,11 +9,11 @@ from lib.providers._shadow import API_UA, ParseDrift, cache, clean, format_resul
 
 API = "https://libgen.li/index.php"
 MIRRORS = (
+    "https://libgen.la",
     "https://libgen.rs",
     "https://libgen.is",
     "https://libgen.st",
     "https://libgen.gs",
-    "https://libgen.la",
 )
 MD5_RE = re.compile(r"md5=([0-9a-fA-F]{32})")
 CHALLENGE_RE = re.compile(
