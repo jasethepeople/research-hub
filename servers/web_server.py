@@ -84,6 +84,7 @@ PROVIDERS = (
     "courtlistener",
     "datacite",
     "x-libgen",
+    "zlib",
 )
 
 PROVIDER_ALIASES = {'rpm78': '78rpm', 'threed': 'models3d', 'x-libgen': 'libgen'}

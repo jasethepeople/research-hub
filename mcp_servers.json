@@ -897,5 +897,17 @@
       "x-libgen"
     ],
     "category": "library"
+  },
+  "zlib": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "zlib"
+    ],
+    "category": "library"
   }
 }

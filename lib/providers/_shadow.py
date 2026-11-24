@@ -194,6 +194,25 @@ def clear_last_http_status() -> None:
             delattr(_request_state, name)
 
 
+def begin_probe_run(max_retries: int = RETRIES) -> None:
+    _request_state.retry_budget_remaining = max(0, min(int(max_retries), RETRIES))
+
+
+def end_probe_run() -> None:
+    if hasattr(_request_state, "retry_budget_remaining"):
+        delattr(_request_state, "retry_budget_remaining")
+
+
+def _consume_retry() -> bool:
+    remaining = getattr(_request_state, "retry_budget_remaining", None)
+    if remaining is None:
+        return True
+    if remaining <= 0:
+        return False
+    _request_state.retry_budget_remaining = remaining - 1
+    return True
+
+
 def note_for_error(error: BaseException) -> str:
     if isinstance(error, ProviderFailure):
         if isinstance(error.__cause__, httpx.TimeoutException):
@@ -304,6 +323,9 @@ def _request(
 ) -> _LimitedResponse:
     max_bytes = max(1, min(int(max_bytes), MAX_JSON_BYTES))
     retry_limit = max(0, min(int(max_retries), RETRIES))
+    run_retry_budget = getattr(_request_state, "retry_budget_remaining", None)
+    if isinstance(run_retry_budget, int):
+        retry_limit = min(retry_limit, max(0, run_retry_budget))
     bases = tuple(dict.fromkeys(str(base).rstrip("/") for base in (mirrors or ()) if base))
     candidates = _mirror_candidates(url, bases)
     if not candidates:
@@ -368,7 +390,7 @@ def _request(
                                 str(response.url),
                             )
                 _request_state.status = limited.status_code
-                if (limited.status_code == 429 or 500 <= limited.status_code <= 599) and retries_used < retry_limit:
+                if (limited.status_code == 429 or 500 <= limited.status_code <= 599) and retries_used < retry_limit and _consume_retry():
                     retries_used += 1
                     time.sleep(0.2 * (2 ** (retries_used - 1)))
                     continue
@@ -406,7 +428,7 @@ def _request(
                 break
             except httpx.RequestError as error:
                 last_error = error
-                if retries_used < retry_limit:
+                if retries_used < retry_limit and _consume_retry():
                     retries_used += 1
                     time.sleep(0.2 * (2 ** (retries_used - 1)))
                     continue
@@ -582,6 +604,8 @@ __all__ = [
     "clean",
     "clamp_limit",
     "clear_last_http_status",
+    "begin_probe_run",
+    "end_probe_run",
     "credential_for",
     "format_results",
     "get_html",
