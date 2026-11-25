@@ -87,7 +87,7 @@ PROVIDERS = (
     "zlib",
 )
 
-PROVIDER_ALIASES = {'rpm78': '78rpm', 'threed': 'models3d', 'x-libgen': 'libgen'}
+PROVIDER_ALIASES = {'rpm78': '78rpm', 'threed': 'models3d', 'x-libgen': 'x_libgen'}
 
 
 def main() -> None:
