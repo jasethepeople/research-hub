@@ -21,7 +21,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - run: uv sync --extra test
+      - run: uv sync --extra test --extra rag
       - run: uv run pytest -q
       - run: uv run ruff check hub servers lib tests
       - run: bash scripts/selfcheck.sh
