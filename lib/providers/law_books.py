@@ -1,54 +1,53 @@
-"""law_books tier: Internet Archive legal-texts corpus.
+"""Search legal history and public-domain law books in Internet Archive."""
 
-Searches the IA full-text corpus for law dictionaries (all Black's Law
-editions), common-law treatises, statutes, court reporters, and legal
-histories. Downloadable as PDF/text via the archive resolver.
-"""
-import urllib.parse
+from lib.providers._shadow import API_UA, cache, format_results, get_json
 
-from lib.providers.http import POLITE_UA, get
+API = "https://archive.org/advancedsearch.php"
+MIRRORS = ("https://archive.org",)
+HEADERS = {"User-Agent": API_UA}
 
 
-def search(query: str, limit: int = 25) -> dict:
-    escaped = urllib.parse.quote(query)
-    pairs = [
-        (f'("{escaped}") AND subject:(law) AND mediatype:texts -collection:(magazine_rack)', None),
-        (
-            f'({escaped}) AND (title:("law dictionary" OR "blacks law" OR "blackstone" '
-            f'OR "statutes" OR "commentaries" OR "case law"))'
-            f' AND mediatype:texts -collection:(magazine_rack)',
-            None,
-        ),
-    ]
-    results: list[dict] = []
-    note = ""
-    for q, _ in pairs:
-        params = {"q": q, "rows": str(limit), "output": "json", "fl[]": "identifier,title,creator,year", "sort[]": "downloads desc"}
-        response = get("https://archive.org/advancedsearch.php", params=params, headers={"User-Agent": POLITE_UA}, timeout=45.0)
-        if response is None or response.status_code != 200:
-            note = "archive.org slow/blocked"
+def parse_response(payload: dict, limit: int = 20) -> dict:
+    response = payload.get("response")
+    if not isinstance(response, dict) or not isinstance(response.get("docs"), list):
+        raise ValueError("Internet Archive response has no response.docs list")
+    results = []
+    for doc in response["docs"]:
+        if not isinstance(doc, dict):
             continue
-        try:
-            docs = response.json().get("response", {}).get("docs", [])
-        except Exception:
-            note = "archive.org returned unparseable response"
+        ident = str(doc.get("identifier") or "").strip()
+        title = " ".join(str(doc.get("title") or "").split())
+        if not ident or not title:
             continue
-        for doc in docs:
-            ident = str(doc.get("identifier") or "")
-            if not ident or any(r["url"] == f"https://archive.org/details/{ident}" for r in results):
-                continue
-            creator = doc.get("creator")
-            creators = ", ".join(creator) if isinstance(creator, list) else str(creator or "")
-            results.append(
-                {
-                    "title": str(doc.get("title") or ident),
-                    "author": creators,
-                    "url": f"https://archive.org/details/{ident}",
-                    "tier": "law-books",
-                    "snippet": str(doc.get("year") or ""),
-                }
-            )
-        if results:
-            note = "Internet Archive legal-texts corpus"
-            break
-    return {"results": results[:limit], "note": note}
+        creator = doc.get("creator") or []
+        if isinstance(creator, str):
+            creators = creator
+        else:
+            creators = ", ".join(str(name).strip() for name in creator if str(name).strip())
+        results.append(
+            {
+                "title": title,
+                "author": creators,
+                "url": f"https://archive.org/details/{ident}",
+                "identifier": ident,
+                "year": str(doc.get("year") or ""),
+                "snippet": " ".join(str(doc.get("description") or "").split())[:500],
+            }
+        )
+    return format_results(results, limit)
+
+
+@cache
+def search(query: str, limit: int = 20) -> dict:
+    payload = get_json(
+        API,
+        params={
+            "q": f'mediatype:texts AND ({query})',
+            "fl[]": ["identifier", "title", "creator", "year", "description"],
+            "rows": limit,
+            "output": "json",
+        },
+        headers=HEADERS,
+        mirrors=MIRRORS,
+    )
+    return parse_response(payload, limit)
