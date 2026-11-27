@@ -16,7 +16,7 @@ from hub.orchestrator import prewarm as prewarm_tiers
 from hub.orchestrator import search_all
 from hub.registry import Registry, assert_mcp_v1
 from hub.storage import Store
-from hub.torrents import TorrentClient, TorrentEngineUnavailable
+from hub.torrents import TorrentClient, TorrentEngineUnavailable, TorrentRPCError
 
 
 class PinRequest(BaseModel):
@@ -164,11 +164,17 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
             raise HTTPException(status_code=422, detail="uri must be a magnet link or a .torrent URL")
         try:
             gid = engine.add(uri)
+            resolved = engine.resolve_torrent_gid(gid)
         except TorrentEngineUnavailable as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
+        except TorrentRPCError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
-        return {"gid": gid, "dir": engine.active_dir}
+        response = {"gid": resolved or gid, "dir": engine.active_dir}
+        if resolved and resolved != gid:
+            response["wrapper_gid"] = gid
+        return response
 
     @app.get("/api/torrents")
     async def torrents_list():
@@ -185,14 +191,18 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
             return engine.detail(gid)
         except TorrentEngineUnavailable as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
+        except TorrentRPCError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
 
     @app.delete("/api/torrent/{gid}")
-    async def torrent_remove(gid: str):
+    async def torrent_remove(gid: str, files: bool = False):
         engine: TorrentClient = app.state.torrents
         try:
-            return engine.remove(gid)
+            return engine.remove(gid, files=files)
         except TorrentEngineUnavailable as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
+        except TorrentRPCError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
 
     @app.get("/api/health")
     async def health():

@@ -6,7 +6,12 @@ from typing import Any
 import httpx
 import pytest
 
-from hub.torrents import RPC_TIMEOUT, TorrentClient, TorrentEngineUnavailable
+from hub.torrents import (
+    RPC_TIMEOUT,
+    TorrentClient,
+    TorrentEngineUnavailable,
+    TorrentRPCError,
+)
 
 
 class StubEngine:
@@ -15,10 +20,15 @@ class StubEngine:
     def __init__(self) -> None:
         self.added: list[str] = []
         self.removed: list[str] = []
+        self.resolved: str | None = None
+        self.files_flag: bool = False
 
     def add(self, uri: str) -> str:
         self.added.append(uri)
         return "gid-1"
+
+    def resolve_torrent_gid(self, gid: str, attempts: int = 6, delay: float = 0.4) -> str | None:
+        return self.resolved
 
     def overview(self) -> dict[str, Any]:
         return {"dir": "/tmp/t", "global": {}, "torrents": [{"gid": "gid-1", "status": "active"}]}
@@ -26,9 +36,10 @@ class StubEngine:
     def detail(self, gid: str) -> dict[str, Any]:
         return {"gid": gid, "status": "complete"}
 
-    def remove(self, gid: str) -> dict[str, Any]:
+    def remove(self, gid: str, files: bool = False) -> dict[str, Any]:
         self.removed.append(gid)
-        return {"removed": gid, "state": "canceled"}
+        self.files_flag = files
+        return {"removed": gid, "state": "canceled", "files_deleted": []}
 
 
 class DeadEngine:
@@ -62,6 +73,15 @@ def test_torrent_add_returns_gid_and_dir(make_client) -> None:
         assert response.json() == {"gid": "gid-1", "dir": engine.active_dir}
         assert engine.added == ["magnet:?xt=urn:btih:abc123"]
 
+def test_torrent_add_returns_resolved_payload_gid(make_client) -> None:
+    with make_client({}) as client:
+        engine = StubEngine()
+        engine.resolved = "gid-2"
+        client.app.state.torrents = engine
+        response = client.post("/api/torrent/add", json={"uri": "https://nyaa.si/download/x.torrent"})
+        assert response.status_code == 200
+        assert response.json() == {"gid": "gid-2", "dir": engine.active_dir, "wrapper_gid": "gid-1"}
+
 
 def test_torrents_list_surfaces_engine_outage_as_503(make_client) -> None:
     with make_client({}) as client:
@@ -78,6 +98,37 @@ def test_torrent_detail_and_remove_pass_gids_through(make_client) -> None:
         assert client.get("/api/torrent/gid-1").json()["gid"] == "gid-1"
         assert client.delete("/api/torrent/gid-1").json()["removed"] == "gid-1"
         assert engine.removed == ["gid-1"]
+
+def test_torrent_remove_purges_stopped_entry_and_cleans_files(make_client, tmp_path) -> None:
+    class PurgeEngine(StubEngine):
+        def detail(self, gid: str) -> dict[str, Any]:
+            return {
+                "gid": gid,
+                "status": "error",
+                "files": [{"path": str(tmp_path / "incomplete.mkv"), "length": 10, "completed": 4}],
+            }
+
+        def remove(self, gid: str, files: bool = False) -> dict[str, Any]:
+            self.removed.append(gid)
+            return {"removed": gid, "state": "purged", "files_deleted": []}
+
+    with make_client({}) as client:
+        engine = PurgeEngine()
+        client.app.state.torrents = engine
+        response = client.delete("/api/torrent/gid-1", params={"files": "true"})
+        assert response.status_code == 200
+        assert response.json()["state"] == "purged"
+
+
+def test_torrent_remove_unknown_gid_maps_to_404(make_client) -> None:
+    class UnknownGidEngine(StubEngine):
+        def remove(self, gid: str, files: bool = False) -> dict[str, Any]:
+            raise TorrentRPCError("no such download")
+
+    with make_client({}) as client:
+        client.app.state.torrents = UnknownGidEngine()
+        response = client.delete("/api/torrent/missing", params={"files": "true"})
+        assert response.status_code == 404
 
 
 def test_download_routes_torrent_uris_to_engine_and_keeps_http_downloads(make_client) -> None:
@@ -142,11 +193,15 @@ def test_torrent_client_maps_compact_job_record() -> None:
         "connections": "3",
         "bittorrent": {"info": {"name": "caedmon_librivox"}},
     }
+    job["followedBy"] = ["g2"]
     record = _compact(job)
     assert record["progress"] == 0.25
     assert record["name"] == "caedmon_librivox"
     assert record["num_seeders"] == 7
     assert record["download_speed"] == 512
+    assert record["followed_by"] == "g2"
+    assert "followed_by" not in _compact({**job, "followedBy": []})
+    assert "followed_by" not in _compact({**job, "followedBy": None})
 
 
 def test_torrent_client_unreachable_rpc_raises(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -169,9 +224,69 @@ def test_torrent_client_wraps_rpc_error_payloads(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr("hub.torrents.httpx.post", error_response)
     engine = TorrentClient()
-    with pytest.raises(TorrentEngineUnavailable, match="no such download"):
+    with pytest.raises(TorrentRPCError, match="no such download"):
         engine._call("aria2.tellStatus", ["missing"])
 
 
 def test_rpc_timeout_is_short_enough_for_request_paths() -> None:
     assert RPC_TIMEOUT <= 5.0
+
+
+class FallbackEngine:
+    """Engine whose first remove fails with a per-request RPC error."""
+
+    active_dir = "/tmp/t"
+
+    def remove(self, gid: str, files: bool = False) -> dict[str, Any]:
+        raise TorrentRPCError("Active Download not found")
+
+
+def test_remove_maps_unknown_gid_to_404(make_client) -> None:
+    with make_client({}) as client:
+        client.app.state.torrents = FallbackEngine()
+        response = client.delete("/api/torrent/gone")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+
+def test_torrent_client_remove_purges_stopped_and_optionally_deletes_files(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    partial = tmp_path / "movie.mkv"
+    partial.write_bytes(b"x")
+    control = tmp_path / "movie.mkv.aria2"
+    control.write_bytes(b"y")
+    calls: list[list[Any]] = []
+
+    def fake_call(self, method: str, params: list[Any] | None = None) -> Any:
+        calls.append([method, params])
+        if method == "aria2.tellStatus":
+            return {"gid": params[0], "status": "error", "files": [{"path": str(partial)}]}
+        if method == "aria2.remove":
+            raise TorrentRPCError("Active Download not found")
+        return "OK"
+
+    engine = TorrentClient(download_dir=str(tmp_path))
+    monkeypatch.setattr(TorrentClient, "_call", fake_call)
+    result = engine.remove("g9", files=True)
+    assert result["state"] == "purged"
+    assert not partial.exists() and not control.exists()
+    assert any("movie.mkv" in p for p in result["files_deleted"])
+
+
+def test_torrent_client_remove_refuses_paths_outside_download_dir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    victim = outside / "keep_me.mkv"
+    victim.write_bytes(b"x")
+
+    def fake_call(self, method: str, params: list[Any] | None = None) -> Any:
+        if method == "aria2.tellStatus":
+            return {"gid": params[0], "status": "error", "files": [{"path": str(victim)}]}
+        if method == "aria2.remove":
+            raise TorrentRPCError("Active Download not found")
+        return "OK"
+
+    engine = TorrentClient(download_dir=str(tmp_path / "downloads"))
+    monkeypatch.setattr(TorrentClient, "_call", fake_call)
+    result = engine.remove("g9", files=True)
+    assert result["files_deleted"] == []
+    assert victim.exists()

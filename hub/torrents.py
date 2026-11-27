@@ -8,6 +8,7 @@ and the API routes surface it as HTTP 503 instead of hanging.
 from __future__ import annotations
 
 import secrets
+import time
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +17,16 @@ import httpx
 RPC_TIMEOUT = 3.0
 _LIST_CHUNK = 200
 _DETAIL_KEYS = ["gid", "status", "totalLength", "completedLength", "downloadSpeed",
-                "numSeeders", "connections", "errorCode", "errorMessage", "bittorrent", "files"]
+                "numSeeders", "connections", "errorCode", "errorMessage", "bittorrent", "files",
+                "followedBy"]
 
 
 class TorrentEngineUnavailable(RuntimeError):
-    """The aria2 RPC endpoint is unreachable or refused the call."""
+    """The aria2 RPC endpoint is unreachable."""
+
+
+class TorrentRPCError(RuntimeError):
+    """aria2 answered, but refused the call (bad gid, wrong state, ...)."""
 
 
 def _frozen_name(job: dict[str, Any]) -> str:
@@ -52,6 +58,11 @@ def _compact(job: dict[str, Any]) -> dict[str, Any]:
     error_code = str(job.get("errorCode") or "").strip()
     if error_code and error_code != "0":
         record["error"] = f"{error_code}: {job.get('errorMessage') or ''}".strip()
+    followed = job.get("followedBy")
+    if isinstance(followed, list):
+        followed = followed[0] if followed else None
+    if followed:
+        record["followed_by"] = str(followed)
     return record
 
 
@@ -88,7 +99,7 @@ class TorrentClient:
         except ValueError as error:
             raise TorrentEngineUnavailable("aria2 RPC returned a non-JSON response") from error
         if "error" in body:
-            raise TorrentEngineUnavailable(str(body["error"]))
+            raise TorrentRPCError(str(body["error"]))
         return body.get("result")
 
     def ping(self) -> bool:
@@ -113,6 +124,19 @@ class TorrentClient:
             return str(option.get("dir") or self.download_dir)
         except TorrentEngineUnavailable:
             return self.download_dir
+
+    def resolve_torrent_gid(self, gid: str, attempts: int = 6, delay: float = 0.4) -> str | None:
+        """Follow aria2's followedBy chain from a .torrent/magnet wrapper download
+        to the gid of the real torrent payload, if one appears."""
+        for _ in range(max(attempts, 1)):
+            record = self.detail(gid)
+            followed = record.get("followed_by")
+            if followed:
+                return str(followed)
+            if record.get("status") not in {"active", "waiting"}:
+                return None
+            time.sleep(delay)
+        return None
 
     def overview(self) -> dict[str, Any]:
         stat = self._call("aria2.getGlobalStat") or {}
@@ -146,12 +170,37 @@ class TorrentClient:
         ]
         return record
 
-    def remove(self, gid: str) -> dict[str, Any]:
+    def remove(self, gid: str, files: bool = False) -> dict[str, Any]:
+        record: dict[str, Any] = {}
+        try:
+            record = self.detail(gid)
+        except TorrentRPCError:
+            pass
         try:
             self._call("aria2.remove", [gid])
-            return {"removed": gid, "state": "canceled"}
-        except TorrentEngineUnavailable:
-            raise
-        except Exception:
+            state = "canceled"
+        except TorrentRPCError:
             self._call("aria2.removeDownloadResult", [gid])
-            return {"removed": gid, "state": "purged"}
+            state = "purged"
+        deleted: list[str] = []
+        if files:
+            for entry in record.get("files") or []:
+                deleted.extend(self._discard_payload(Path(entry["path"])))
+        return {"removed": gid, "state": state, "files_deleted": deleted}
+
+    def _discard_payload(self, path: Path) -> list[str]:
+        """Best-effort delete of a payload file and its .aria2 control file.
+        Refuses anything outside the download directory."""
+        removed: list[str] = []
+        try:
+            resolved = path.resolve()
+            resolved.relative_to(Path(self.download_dir).resolve())
+        except ValueError:
+            return removed
+        for candidate in (resolved, Path(f"{resolved}.aria2")):
+            try:
+                candidate.unlink()
+                removed.append(str(candidate))
+            except OSError:
+                pass
+        return removed

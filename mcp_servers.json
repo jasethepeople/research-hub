@@ -825,5 +825,101 @@
       "{{DEPLOY_DIR}}/servers/web_server.py",
       "courtlistener"
     ]
+  },
+  "arxiv": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "arxiv"
+    ],
+    "category": "general"
+  },
+  "metmuseum": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "metmuseum"
+    ],
+    "category": "media"
+  },
+  "smithsonian": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "smithsonian"
+    ],
+    "category": "media"
+  },
+  "x-libgen": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "x-libgen"
+    ],
+    "category": "library"
+  },
+  "datacite": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "datacite"
+    ],
+    "category": "library"
+  },
+  "zlib": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "zlib"
+    ],
+    "category": "library"
+  },
+  "yts": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "yts"
+    ],
+    "category": "media"
+  },
+  "nyaa": {
+    "command": "uv",
+    "args": [
+      "run",
+      "--with",
+      "mcp[cli]<2,httpx",
+      "python",
+      "{{DEPLOY_DIR}}/servers/web_server.py",
+      "nyaa"
+    ],
+    "category": "media"
   }
 }
