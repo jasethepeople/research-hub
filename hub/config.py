@@ -21,6 +21,13 @@ class Settings:
     registry_path: Path = field(
         default_factory=lambda: _path_env("HUB_MCP_SERVERS", str(DEPLOY_DIR / "mcp_servers.json"))
     )
+    torrents_dir: Path = field(
+        default_factory=lambda: _path_env("HUB_TORRENTS_DIR", str(Path.home() / "Downloads" / "torrents"))
+    )
+    aria2_rpc_url: str = field(
+        default_factory=lambda: os.environ.get("HUB_ARIA2_RPC", "http://127.0.0.1:6800/jsonrpc")
+    )
+    aria2_secret: str = field(default_factory=lambda: os.environ.get("HUB_ARIA2_SECRET", ""))
 
 
 DEFAULT_SETTINGS = Settings()

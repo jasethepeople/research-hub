@@ -16,6 +16,7 @@ from hub.orchestrator import prewarm as prewarm_tiers
 from hub.orchestrator import search_all
 from hub.registry import Registry, assert_mcp_v1
 from hub.storage import Store
+from hub.torrents import TorrentClient, TorrentEngineUnavailable
 
 
 class PinRequest(BaseModel):
@@ -29,6 +30,12 @@ class WatchRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     query: str = Field(min_length=1, max_length=2000)
+
+
+class TorrentAddRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    uri: str = Field(min_length=1, max_length=4000)
 
 
 def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
@@ -47,6 +54,11 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
         app.state.cache = ResponseCache(ttl=CACHE_TTL, maxsize=500)
         downloads = DownloadManager(settings.state_dir)
         app.state.downloads = downloads
+        app.state.torrents = TorrentClient(
+            rpc_url=settings.aria2_rpc_url,
+            download_dir=settings.torrents_dir,
+            secret=settings.aria2_secret,
+        )
         app.state.prewarm_task = asyncio.create_task(
             prewarm_tiers(registry, settings.deploy_dir)
         )
@@ -96,10 +108,27 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
     @app.post("/api/download")
     async def download_enqueue(payload: DownloadRequest):
         manager: DownloadManager = app.state.downloads
+        engine: TorrentClient = app.state.torrents
         items = payload.items[:200]
         if not items:
             raise HTTPException(status_code=422, detail="items must not be empty")
-        return {"queued": manager.enqueue([item.model_dump() for item in items], resolve=payload.resolve)}
+        torrents, plain = [], []
+        for item in items:
+            url = str(item.url or "").strip()
+            if _torrent_uri_ok(url):
+                try:
+                    torrents.append({"gid": engine.add(url), "url": url})
+                except TorrentEngineUnavailable as error:
+                    raise HTTPException(status_code=503, detail=str(error)) from error
+                except ValueError as error:
+                    raise HTTPException(status_code=422, detail=str(error)) from error
+            else:
+                plain.append(item.model_dump())
+        response: dict[str, Any] = {"queued": manager.enqueue(plain, resolve=payload.resolve)}
+        if torrents:
+            response["torrents"] = torrents
+            response["dir"] = engine.active_dir
+        return response
 
     @app.get("/api/downloads")
     async def downloads_list():
@@ -120,6 +149,50 @@ def create_app(settings: Settings = DEFAULT_SETTINGS) -> FastAPI:
         if not job or job["status"] != "done" or not job.get("path"):
             raise HTTPException(status_code=404, detail="download not ready")
         return FileResponse(job["path"], filename=job.get("filename") or "download.bin")
+
+    def _torrent_uri_ok(uri: str) -> bool:
+        lowered = uri.strip().casefold()
+        return lowered.startswith(("magnet:", "http://", "https://")) and (
+            lowered.startswith("magnet:") or lowered.endswith(".torrent") or "torrent" in lowered
+        )
+
+    @app.post("/api/torrent/add")
+    async def torrent_add(payload: TorrentAddRequest):
+        engine: TorrentClient = app.state.torrents
+        uri = payload.uri.strip()
+        if not _torrent_uri_ok(uri):
+            raise HTTPException(status_code=422, detail="uri must be a magnet link or a .torrent URL")
+        try:
+            gid = engine.add(uri)
+        except TorrentEngineUnavailable as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {"gid": gid, "dir": engine.active_dir}
+
+    @app.get("/api/torrents")
+    async def torrents_list():
+        engine: TorrentClient = app.state.torrents
+        try:
+            return engine.overview()
+        except TorrentEngineUnavailable as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @app.get("/api/torrent/{gid}")
+    async def torrent_detail(gid: str):
+        engine: TorrentClient = app.state.torrents
+        try:
+            return engine.detail(gid)
+        except TorrentEngineUnavailable as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @app.delete("/api/torrent/{gid}")
+    async def torrent_remove(gid: str):
+        engine: TorrentClient = app.state.torrents
+        try:
+            return engine.remove(gid)
+        except TorrentEngineUnavailable as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     @app.get("/api/health")
     async def health():
